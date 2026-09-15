@@ -1,0 +1,19 @@
+export default function BrandMark({
+  compact = false,
+  href = "#home",
+  onClick,
+}) {
+  return (
+    <a
+      className={`brand-mark ${compact ? "compact" : ""}`}
+      href={href}
+      onClick={onClick}
+      aria-label="Tita Mars home"
+    >
+      <img
+        src="/assets/logo-horizontal.png"
+        alt="Tita Mars Eatery and Bakery"
+      />
+    </a>
+  );
+}

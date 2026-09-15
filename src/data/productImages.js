@@ -1,0 +1,26 @@
+export const productImages = {
+  "TME-001": "adobo",
+  "TME-002": "chicken",
+  "TME-003": "sinigang",
+  "TME-004": "hotdog",
+  "TME-005": "lumpia",
+  "TME-006": "longanisa",
+  "TME-007": "rice",
+  "TME-008": "egg",
+  "TME-009": "fried-rice",
+  "TME-010": "pansit",
+  "RBB-001": "hopia-monggo",
+  "RBB-002": "hopia-ube",
+  "RBB-003": "hopia-de-leche",
+  "RBB-004": "banana-loaf",
+  "RBB-005": "egg-pie",
+  "RBB-006": "hokkaido-cheese-rolls",
+  "GAB-001": "cheese-roll",
+  "GAB-002": "ube-ensaymada",
+  "GAB-003": "ensaymada",
+  "GAB-004": "combi-pie",
+  "GAB-005": "ube-cake",
+  "GAB-006": "banana-loaf",
+};
+export const imageForProduct = (id) =>
+  productImages[id] ? "/assets/" + productImages[id] + ".png" : "";
