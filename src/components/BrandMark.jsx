@@ -1,3 +1,5 @@
+import { assetUrl } from "../utils/assets";
+
 export default function BrandMark({
   compact = false,
   href = "#home",
@@ -11,7 +13,7 @@ export default function BrandMark({
       aria-label="Tita Mars home"
     >
       <img
-        src="/assets/logo-horizontal.png"
+        src={assetUrl("logo-horizontal.png")}
         alt="Tita Mars Eatery and Bakery"
       />
     </a>

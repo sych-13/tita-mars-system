@@ -1,4 +1,5 @@
 import ProductCard from "./ProductCard";
+import { assetUrl } from "../utils/assets";
 import Icon from "./Icon";
 import { useProducts } from "../context/ProductContext";
 import { useShop } from "../context/ShopContext";
@@ -32,7 +33,7 @@ export default function HomePage() {
         <section className="home-feature">
           <div className="home-hero">
             <img
-              src="/assets/hero-food.png"
+              src={assetUrl("hero-food.png")}
               className="hero-photo"
               alt="Filipino adobo with rice and freshly baked bread"
             />

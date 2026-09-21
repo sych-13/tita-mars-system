@@ -1,3 +1,5 @@
+import { assetUrl } from "../utils/assets";
+
 export const productImages = {
   "TME-001": "adobo",
   "TME-002": "chicken",
@@ -23,4 +25,4 @@ export const productImages = {
   "GAB-006": "banana-loaf",
 };
 export const imageForProduct = (id) =>
-  productImages[id] ? "/assets/" + productImages[id] + ".png" : "";
+  productImages[id] ? assetUrl(productImages[id] + ".png") : "";

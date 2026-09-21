@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { assetUrl } from "../utils/assets";
 import { useSession } from "../context/SessionContext";
 import { getAccounts, saveAccount } from "../utils/accounts";
 import { useHashRoute } from "../hooks/useHashRoute";
@@ -72,7 +73,7 @@ export default function AuthPage({ mode = "login" }) {
   return (
     <section className="auth-page container">
       <div className="auth-story">
-        <img src="/assets/hero-food.png" alt="A comforting Filipino meal" />
+        <img src={assetUrl("hero-food.png")} alt="A comforting Filipino meal" />
         <div>
           <p className="eyebrow">Welcome to Tita Mars</p>
           <h2>

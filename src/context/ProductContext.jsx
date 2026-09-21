@@ -9,6 +9,7 @@ import {
 } from "react";
 import { seedProducts } from "../data/products";
 import { imageForProduct } from "../data/productImages";
+import { normalizeAssetUrl } from "../utils/assets";
 import { readStorage, writeStorage } from "../utils/storage";
 
 const ProductContext = createContext();
@@ -22,7 +23,7 @@ const formatProduct = (product) => {
     ...product,
     image: product.image?.includes("images.unsplash.com/")
       ? imageForProduct(product.id) || product.image
-      : product.image,
+      : normalizeAssetUrl(product.image),
     price: Math.max(0, Number(product.price) || 0),
     stock,
     available: stock > 0 && product.available !== false,

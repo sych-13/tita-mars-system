@@ -87,7 +87,7 @@ try {
     expected,
   );
   assert(
-    catalog.every((p) => p.stock === 20 && p.image.startsWith("/assets/")),
+    catalog.every((p) => p.stock === 20 && p.image.startsWith(new URL("assets/", base).pathname)),
   );
   assert.equal(new Set(catalog.map((p) => p.id)).size, 22);
   pass(

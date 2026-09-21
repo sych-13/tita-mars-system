@@ -1,4 +1,5 @@
 import { useShop } from "../context/ShopContext";
+import { assetUrl } from "../utils/assets";
 import Icon from "./Icon";
 export default function AboutPage() {
   const { settings } = useShop();
@@ -50,7 +51,7 @@ export default function AboutPage() {
         </div>
         <aside className="about-contact-card">
           <img
-            src="/assets/hero-food.png"
+            src={assetUrl("hero-food.png")}
             alt="Adobo, rice and fresh bread"
             style={{ borderRadius: 9, width: "100%" }}
           />
