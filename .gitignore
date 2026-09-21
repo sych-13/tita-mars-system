@@ -1,2 +1,7 @@
 node_modules
 .pages-build/
+.env
+.env.*
+!.env.example
+firebase-debug.log
+tmp/
