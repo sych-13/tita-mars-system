@@ -17,6 +17,12 @@ export default function Navbar() {
   const { route, navigate } = useHashRoute();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const workspace =
+    role === "owner"
+      ? { href: "#owner", label: "Owner dashboard", icon: "chart" }
+      : role === "staff"
+        ? { href: "#staff", label: "Staff dashboard", icon: "orders" }
+        : null;
   useEffect(() => setOpen(false), [route]);
   useEffect(() => {
     const close = (e) => {
@@ -77,6 +83,16 @@ export default function Navbar() {
             <Icon name="cart" size={24} />
             {itemCount > 0 && <span className="cart-count">{itemCount}</span>}
           </a>
+          {workspace && (
+            <a
+              className="workspace-link"
+              href={workspace.href}
+              aria-label={`Return to ${workspace.label}`}
+            >
+              <Icon name={workspace.icon} size={19} />
+              <span>{workspace.label}</span>
+            </a>
+          )}
           <a
             href={user ? "#profile" : "#access"}
             className="profile-button"

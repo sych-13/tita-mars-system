@@ -12,9 +12,6 @@ export default function Modal({ title, children, onClose, className = "" }) {
       className={`tm-modal ${className}`}
       ref={ref}
       onCancel={onClose}
-      onClick={(event) => {
-        if (event.target === ref.current) onClose();
-      }}
       aria-labelledby="modal-title"
     >
       <header>

@@ -331,6 +331,7 @@ h2 {
 }
 .theme-toggle,
 .profile-button,
+.workspace-link,
 .sign-out {
   display: inline-flex;
   min-height: 2.45rem;
@@ -347,7 +348,8 @@ h2 {
   cursor: pointer;
 }
 .theme-toggle:hover,
-.profile-button:hover {
+.profile-button:hover,
+.workspace-link:hover {
   border-color: var(--primary-orange);
   color: var(--primary-orange);
 }
@@ -361,6 +363,16 @@ h2 {
     var(--border-color)
   );
   color: var(--primary-orange);
+}
+.workspace-link {
+  border-color: color-mix(
+    in srgb,
+    var(--primary-orange) 65%,
+    var(--border-color)
+  );
+  background: color-mix(in srgb, var(--primary-orange) 9%, var(--surface-color));
+  color: var(--primary-orange);
+  text-decoration: none;
 }
 .nav-menu-button {
   display: none;
@@ -2777,6 +2789,13 @@ h2 {
   .main-nav a {
     font-size: 0.76rem;
   }
+  .workspace-link {
+    width: 2.45rem;
+    padding: 0.35rem;
+  }
+  .workspace-link span {
+    display: none;
+  }
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2883,11 +2902,13 @@ h2 {
   }
   .brand-mark small,
   .theme-toggle span,
-  .profile-button span {
+  .profile-button span,
+  .workspace-link span {
     display: none;
   }
   .theme-toggle,
-  .profile-button {
+  .profile-button,
+  .workspace-link {
     width: 2.4rem;
     padding: 0.35rem;
   }

@@ -3,14 +3,22 @@ import Footer from "../components/Footer";
 import Icon from "../components/Icon";
 import { useHashRoute } from "../hooks/useHashRoute";
 import { useCart } from "../context/CartContext";
+import { useSession } from "../context/SessionContext";
 export default function CustomerLayout({ children }) {
   const { route } = useHashRoute();
   const { itemCount } = useCart();
+  const { role } = useSession();
+  const workspace =
+    role === "owner"
+      ? ["owner", "chart", "Workspace"]
+      : role === "staff"
+        ? ["staff", "orders", "Workspace"]
+        : ["profile", "user", "Account"];
   const nav = [
     ["home", "home", "Home"],
     ["catalog", "meal", "Menu"],
     ["cart", "cart", "Cart"],
-    ["profile", "user", "Account"],
+    workspace,
   ];
   return (
     <div className="customer-shell">
