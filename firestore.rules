@@ -6,39 +6,71 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function profilePath(userId) {
+      return /databases/$(database)/documents/profiles/$(userId);
+    }
+
     function hasProfile() {
-      return signedIn() && exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
+      return signedIn() && exists(profilePath(request.auth.uid));
     }
 
     function isOwner() {
       return hasProfile() &&
-        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'owner' &&
-        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.active == true;
+        get(profilePath(request.auth.uid)).data.role == 'owner' &&
+        get(profilePath(request.auth.uid)).data.active == true;
     }
 
     function isStaff() {
       return hasProfile() &&
-        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.active == true &&
-        (get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'owner' ||
-         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'staff');
+        get(profilePath(request.auth.uid)).data.active == true &&
+        (get(profilePath(request.auth.uid)).data.role == 'owner' ||
+         get(profilePath(request.auth.uid)).data.role == 'staff');
+    }
+
+    function isOwnOrder() {
+      return signedIn() && resource.data.customerId == request.auth.uid;
+    }
+
+    function validStatusForOrder() {
+      return (resource.data.orderType == 'delivery' &&
+        request.resource.data.status in [
+          'Pending', 'Confirmed', 'Preparing', 'Out for Delivery',
+          'Completed', 'Cancelled'
+        ]) ||
+        (resource.data.orderType != 'delivery' &&
+          request.resource.data.status in [
+            'Pending', 'Confirmed', 'Preparing', 'Ready for Pickup',
+            'Completed', 'Cancelled'
+          ]);
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if isOwner();
+      allow create, delete: if isOwner();
+      allow update: if isOwner() ||
+        (isStaff() &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['stock', 'available', 'updatedAt']) &&
+          request.resource.data.stock <= resource.data.stock &&
+          ((request.resource.data.stock > 0 &&
+            request.resource.data.available == resource.data.available) ||
+           (request.resource.data.stock == 0 &&
+            request.resource.data.available == false)));
     }
 
     match /profiles/{profileId} {
-      allow read: if signedIn() && (request.auth.uid == profileId || isStaff());
+      allow read: if signedIn() && (request.auth.uid == profileId || isOwner());
       allow create: if signedIn() &&
         request.auth.uid == profileId &&
         request.resource.data.role == 'customer' &&
         request.resource.data.active == true;
       allow update: if isOwner() ||
         (signedIn() &&
-         request.auth.uid == profileId &&
-         request.resource.data.role == resource.data.role &&
-         request.resource.data.active == resource.data.active);
+          request.auth.uid == profileId &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.active == resource.data.active &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'email', 'phone', 'address', 'updatedAt']));
       allow delete: if isOwner();
     }
 
@@ -47,9 +79,23 @@ service cloud.firestore {
         request.resource.data.customerId == request.auth.uid &&
         request.resource.data.status == 'Pending' &&
         request.resource.data.inventoryDeductedAt == null;
-      allow read: if signedIn() &&
-        (resource.data.customerId == request.auth.uid || isStaff());
-      allow update: if isStaff();
+      allow read: if signedIn() && (resource.data.customerId == request.auth.uid || isStaff());
+      allow update: if
+        (isStaff() &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'inventoryDeductedAt']) &&
+          validStatusForOrder() &&
+          (resource.data.status != 'Completed' ||
+            request.resource.data.status == 'Completed')) ||
+        (isOwnOrder() &&
+          resource.data.status == 'Completed' &&
+          !resource.data.keys().hasAny(['review']) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['review']) &&
+          request.resource.data.review.rating is int &&
+          request.resource.data.review.rating >= 1 &&
+          request.resource.data.review.rating <= 5 &&
+          request.resource.data.review.comment is string);
       allow delete: if isOwner();
     }
 

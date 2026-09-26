@@ -6,10 +6,13 @@ import Icon from "./Icon";
 export default function SettingsPage() {
   const { settings, saveSettings, notify } = useShop();
   const [draft, setDraft] = useState(settings);
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    saveSettings({ ...draft, deliveryFee: Number(draft.deliveryFee) });
-    notify("Store settings saved.");
+    const result = await saveSettings({
+      ...draft,
+      deliveryFee: Number(draft.deliveryFee),
+    });
+    notify(result.ok ? "Store settings saved." : result.error);
   };
   return (
     <DashboardLayout role="Owner / Admin">

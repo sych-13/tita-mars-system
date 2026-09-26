@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { getAccounts, saveAccount, ACCOUNT_KEY } from "../utils/accounts";
 import { writeStorage } from "../utils/storage";
+import { firestore } from "../lib/firebase";
 import { useShop } from "../context/ShopContext";
+import { useSession } from "../context/SessionContext";
 import DashboardLayout from "../layouts/DashboardLayout";
 import Icon from "./Icon";
 import Modal from "./Modal";
@@ -12,6 +15,24 @@ export default function StaffManagement() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { notify } = useShop();
+  const { usingFirebase, user } = useSession();
+  useEffect(() => {
+    if (!usingFirebase || !firestore) {
+      setAccounts(getAccounts());
+      return undefined;
+    }
+    if (!user) {
+      setAccounts([]);
+      return undefined;
+    }
+    return onSnapshot(
+      query(collection(firestore, "profiles"), where("role", "==", "staff")),
+      (snapshot) =>
+        setAccounts(
+          snapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
+        ),
+    );
+  }, [user, usingFirebase]);
   const staff = accounts.filter(
     (a) =>
       a.role === "staff" &&
@@ -20,15 +41,50 @@ export default function StaffManagement() {
   const save = async (e) => {
     e.preventDefault();
     setBusy(true);
-    const result = await saveAccount({ ...draft, role: "staff" }, draft.id);
+    let result;
+    if (usingFirebase && firestore) {
+      try {
+        await updateDoc(doc(firestore, "profiles", draft.id), {
+          name: draft.name.trim(),
+          phone: draft.phone?.trim() || "",
+          updatedAt: new Date().toISOString(),
+        });
+        result = { ok: true };
+      } catch (caught) {
+        result = {
+          ok: false,
+          error:
+            caught?.code === "permission-denied" ||
+            caught?.code === "firestore/permission-denied"
+              ? "Only the owner can edit staff profiles."
+              : "Unable to save this staff profile.",
+        };
+      }
+    } else result = await saveAccount({ ...draft, role: "staff" }, draft.id);
     setBusy(false);
     if (result.ok) {
-      setAccounts(getAccounts());
+      if (!usingFirebase) setAccounts(getAccounts());
       setDraft(null);
       notify("Staff account saved.");
     } else setError(result.error);
   };
-  const toggle = (account) => {
+  const toggle = async (account) => {
+    if (usingFirebase && firestore) {
+      try {
+        await updateDoc(doc(firestore, "profiles", account.id), {
+          active: !account.active,
+          updatedAt: new Date().toISOString(),
+        });
+        notify(
+          account.active
+            ? "Staff account deactivated."
+            : "Staff account restored.",
+        );
+      } catch {
+        notify("Unable to update this staff account.");
+      }
+      return;
+    }
     const next = accounts.map((a) =>
       a.id === account.id ? { ...a, active: !a.active } : a,
     );
@@ -46,22 +102,34 @@ export default function StaffManagement() {
           <h1>Staff Management</h1>
           <p>Manage the people who keep Tita Mars running.</p>
         </div>
-        <button
-          className="btn-brand"
-          onClick={() => {
-            setDraft({
-              name: "",
-              email: "",
-              password: "",
-              phone: "",
-              active: true,
-            });
-            setError("");
-          }}
-        >
-          <Icon name="plus" size={17} />
-          Add Staff
-        </button>
+        {usingFirebase ? (
+          <a
+            className="btn-brand"
+            href="https://console.firebase.google.com/project/tita-mars-system-202609/authentication/users"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Icon name="users" size={17} />
+            Add staff in Firebase
+          </a>
+        ) : (
+          <button
+            className="btn-brand"
+            onClick={() => {
+              setDraft({
+                name: "",
+                email: "",
+                password: "",
+                phone: "",
+                active: true,
+              });
+              setError("");
+            }}
+          >
+            <Icon name="plus" size={17} />
+            Add Staff
+          </button>
+        )}
       </header>
       <section className="simple-card">
         <div className="table-toolbar">
@@ -135,7 +203,11 @@ export default function StaffManagement() {
           <div className="dashboard-empty">
             <Icon name="users" size={38} />
             <h3>Your team starts here</h3>
-            <p>Add a staff member so they can sign in and manage orders.</p>
+            <p>
+              {usingFirebase
+                ? "Create their sign-in and staff profile in Firebase, then they will appear here."
+                : "Add a staff member so they can sign in and manage orders."}
+            </p>
           </div>
         )}
       </section>
@@ -145,16 +217,19 @@ export default function StaffManagement() {
           onClose={() => setDraft(null)}
         >
           <form onSubmit={save}>
-            {[
-              ["name", "Full name", "text"],
-              ["email", "Email address", "email"],
-              ["phone", "Mobile number", "tel"],
-              [
-                "password",
-                draft.id ? "New password (optional)" : "Password",
-                "password",
-              ],
-            ].map(([name, label, type]) => (
+            {(usingFirebase
+              ? [["name", "Full name", "text"], ["phone", "Mobile number", "tel"]]
+              : [
+                  ["name", "Full name", "text"],
+                  ["email", "Email address", "email"],
+                  ["phone", "Mobile number", "tel"],
+                  [
+                    "password",
+                    draft.id ? "New password (optional)" : "Password",
+                    "password",
+                  ],
+                ]
+            ).map(([name, label, type]) => (
               <label key={name}>
                 {label}
                 <input

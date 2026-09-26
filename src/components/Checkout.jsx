@@ -10,7 +10,7 @@ import Icon from "./Icon";
 export default function Checkout() {
   const { items, total, clearCart } = useCart();
   const { orders, createOrder } = useOrders();
-  const { user } = useSession();
+  const { user, usingFirebase } = useSession();
   const { settings } = useShop();
   const { params, navigate } = useHashRoute();
   const [orderType, setOrderType] = useState("pickup");
@@ -39,7 +39,7 @@ export default function Checkout() {
     if (order) confirmationRef.current?.focus();
   }, [order?.id]);
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (submitting.current || !items.length) return;
     if (
@@ -53,7 +53,7 @@ export default function Checkout() {
     submitting.current = true;
     setBusy(true);
     setError("");
-    const result = createOrder({
+    const result = await createOrder({
       customerId: user?.id || null,
       customer: form.name.trim(),
       phone: form.phone.trim(),
@@ -154,6 +154,12 @@ export default function Checkout() {
         {error && (
           <p className="form-error" role="alert">
             {error}
+          </p>
+        )}
+        {usingFirebase && !user && (
+          <p className="checkout-error">
+            Please <a href="#login?role=customer&next=checkout">sign in</a> to
+            place and track your order across devices.
           </p>
         )}
         {!items.length ? (

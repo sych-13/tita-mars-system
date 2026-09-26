@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { firebaseConfigured, firestore } from "../lib/firebase";
 import { readStorage, writeStorage } from "../utils/storage";
 const ShopContext = createContext();
 const defaults = {
@@ -20,7 +22,15 @@ export function ShopProvider({ children }) {
     readStorage("tita-mars-favorites", []),
   );
   const [notice, setNotice] = useState("");
-  useEffect(() => writeStorage("tita-mars-settings", settings), [settings]);
+  useEffect(() => {
+    if (!firebaseConfigured) writeStorage("tita-mars-settings", settings);
+  }, [settings]);
+  useEffect(() => {
+    if (!firebaseConfigured || !firestore) return undefined;
+    return onSnapshot(doc(firestore, "settings", "store"), (snapshot) => {
+      if (snapshot.exists()) setSettings({ ...defaults, ...snapshot.data() });
+    });
+  }, []);
   useEffect(() => writeStorage("tita-mars-favorites", favorites), [favorites]);
   useEffect(() => {
     if (!notice) return;
@@ -30,7 +40,28 @@ export function ShopProvider({ children }) {
   const value = useMemo(
     () => ({
       settings,
-      saveSettings: setSettings,
+      saveSettings: async (next) => {
+        const values = { ...settings, ...next };
+        if (firebaseConfigured && firestore) {
+          try {
+            await setDoc(doc(firestore, "settings", "store"), values, {
+              merge: true,
+            });
+            return { ok: true };
+          } catch (error) {
+            return {
+              ok: false,
+              error:
+                error?.code === "permission-denied" ||
+                error?.code === "firestore/permission-denied"
+                  ? "Only the owner can change store settings."
+                  : "Unable to save store settings.",
+            };
+          }
+        }
+        setSettings(values);
+        return { ok: true };
+      },
       favorites,
       toggleFavorite: (id) =>
         setFavorites((current) =>

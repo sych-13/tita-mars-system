@@ -53,16 +53,16 @@ export default function InventoryManagement({ role = "owner" }) {
     )
     .slice(0, 8);
   const current = products.find((product) => product.id === selected);
-  const restock = (event) => {
+  const restock = async (event) => {
     event.preventDefault();
     const amount = Number(quantity);
     if (!current || !Number.isInteger(amount) || amount < 1) return;
-    updateProduct(current.id, (product) => ({
+    const result = await updateProduct(current.id, (product) => ({
       stock: product.stock + amount,
       available: product.stock === 0 ? true : product.available,
     }));
-    notify(amount + " units added to " + current.name + ".");
-    setSelected(null);
+    notify(result.ok ? amount + " units added to " + current.name + "." : result.error);
+    if (result.ok) setSelected(null);
   };
   return (
     <DashboardLayout role={role === "staff" ? "Staff" : "Owner / Admin"}>

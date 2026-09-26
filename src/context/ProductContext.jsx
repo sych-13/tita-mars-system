@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { seedProducts } from "../data/products";
 import { imageForProduct } from "../data/productImages";
+import { firebaseConfigured, firestore } from "../lib/firebase";
 import { normalizeAssetUrl } from "../utils/assets";
 import { readStorage, writeStorage } from "../utils/storage";
 
@@ -38,6 +40,12 @@ const getInitialProducts = () => {
     : cloneSeedProducts();
 };
 
+const productError = (error, fallback) =>
+  error?.code === "permission-denied" ||
+  error?.code === "firestore/permission-denied"
+    ? "Your account does not have permission to change products."
+    : fallback;
+
 export function ProductProvider({ children }) {
   const [products, setProducts] = useState(getInitialProducts);
   const productsRef = useRef(products);
@@ -52,34 +60,58 @@ export function ProductProvider({ children }) {
 
   useEffect(() => {
     productsRef.current = products;
-    writeStorage(STORAGE_KEY, products);
+  }, [products]);
+
+  useEffect(() => {
+    if (!firebaseConfigured || !firestore) return undefined;
+    return onSnapshot(collection(firestore, "products"), (snapshot) => {
+        const next = snapshot.docs
+          .map((item) => formatProduct({ id: item.id, ...item.data() }))
+          .sort((a, b) => a.id.localeCompare(b.id));
+        if (next.length) commitProducts(next);
+      });
+  }, [commitProducts]);
+
+  useEffect(() => {
+    if (!firebaseConfigured) writeStorage(STORAGE_KEY, products);
   }, [products]);
 
   const updateProduct = useCallback(
-    (id, changes) => {
-      commitProducts((current) =>
-        current.map((product) => {
-          if (product.id !== id) return product;
-          const resolvedChanges =
-            typeof changes === "function" ? changes(product) : changes;
-          const next = formatProduct({
-            ...product,
-            ...resolvedChanges,
-            updatedAt: new Date().toISOString(),
-          });
-          if (next.stock === 0) next.available = false;
-          return next;
-        }),
+    async (id, changes) => {
+      const current = productsRef.current.find((product) => product.id === id);
+      if (!current) return { ok: false, error: "Product not found." };
+      const resolvedChanges =
+        typeof changes === "function" ? changes(current) : changes;
+      const next = formatProduct({
+        ...current,
+        ...resolvedChanges,
+        updatedAt: new Date().toISOString(),
+      });
+      if (next.stock === 0) next.available = false;
+
+      if (firebaseConfigured && firestore) {
+        try {
+          await updateDoc(doc(firestore, "products", id), next);
+          return { ok: true, product: next };
+        } catch (error) {
+          return { ok: false, error: productError(error, "Unable to update this product.") };
+        }
+      }
+
+      commitProducts((items) =>
+        items.map((product) => (product.id === id ? next : product)),
       );
+      return { ok: true, product: next };
     },
     [commitProducts],
   );
 
   const addProduct = useCallback(
-    (data) => {
+    async (data) => {
       const id = data.id?.trim() || `TM-${Date.now().toString().slice(-6)}`;
       if (productsRef.current.some((product) => product.id === id))
         return { ok: false, error: "That Product ID is already in use." };
+      const timestamp = new Date().toISOString();
       const product = formatProduct({
         id,
         name: data.name?.trim(),
@@ -91,12 +123,28 @@ export function ProductProvider({ children }) {
         archived: false,
         image: data.image?.trim() || seedProducts[0].image,
         description: data.description?.trim() || "Available from Tita Mars.",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: timestamp,
+        updatedAt: timestamp,
       });
       if (!product.name || !product.supplier)
         return { ok: false, error: "Product name and supplier are required." };
-      commitProducts((current) => [...current, product]);
+      if (firebaseConfigured && product.image.startsWith("data:"))
+        return {
+          ok: false,
+          error:
+            "Image file uploads need Firebase Storage. Use an image URL for now.",
+        };
+
+      if (firebaseConfigured && firestore) {
+        try {
+          await setDoc(doc(firestore, "products", id), product);
+          return { ok: true, product };
+        } catch (error) {
+          return { ok: false, error: productError(error, "Unable to add this product.") };
+        }
+      }
+
+      commitProducts((items) => [...items, product]);
       return { ok: true, product };
     },
     [commitProducts],
@@ -109,8 +157,9 @@ export function ProductProvider({ children }) {
   const restoreProduct = useCallback(
     (id) => {
       const product = productsRef.current.find((item) => item.id === id);
-      if (product)
-        updateProduct(id, { archived: false, available: product.stock > 0 });
+      return product
+        ? updateProduct(id, { archived: false, available: product.stock > 0 })
+        : Promise.resolve({ ok: false, error: "Product not found." });
     },
     [updateProduct],
   );
@@ -147,6 +196,11 @@ export function ProductProvider({ children }) {
 
   const deductInventory = useCallback(
     (items) => {
+      if (firebaseConfigured)
+        return {
+          ok: false,
+          error: "Inventory is recorded with the order transaction.",
+        };
       if (!Array.isArray(items) || !items.length)
         return { ok: false, error: "This order has no items to deduct." };
       const required = items.reduce(
@@ -180,7 +234,6 @@ export function ProductProvider({ children }) {
           return {
             ...product,
             stock,
-            // Preserve a manual hidden/unavailable setting. Zero stock always disables ordering.
             available: stock > 0 ? product.available : false,
             updatedAt: timestamp,
           };
@@ -188,13 +241,14 @@ export function ProductProvider({ children }) {
       );
       return { ok: true, deductedAt: timestamp };
     },
-    [commitProducts, validateOrderItems],
+    [commitProducts],
   );
 
   const value = useMemo(
     () => ({
       products,
       lowStockLimit: LOW_STOCK_LIMIT,
+      usingFirebase: firebaseConfigured,
       updateProduct,
       addProduct,
       archiveProduct,
@@ -212,7 +266,6 @@ export function ProductProvider({ children }) {
       validateOrderItems,
     ],
   );
-
   return (
     <ProductContext.Provider value={value}>{children}</ProductContext.Provider>
   );

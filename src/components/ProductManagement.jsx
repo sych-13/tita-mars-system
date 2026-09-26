@@ -50,7 +50,7 @@ export default function ProductManagement() {
     const { name, value, type, checked } = e.target;
     setDraft({ ...draft, [name]: type === "checkbox" ? checked : value });
   };
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
     if (!draft.name.trim() || !draft.supplier.trim()) {
       setError("Enter a product name and supplier.");
@@ -64,12 +64,18 @@ export default function ProductManagement() {
       stock: Number(draft.stock),
     };
     if (!editing) {
-      const r = addProduct(values);
+      const r = await addProduct(values);
       if (!r.ok) {
         setError(r.error);
         return;
       }
-    } else updateProduct(draft.id, values);
+    } else {
+      const r = await updateProduct(draft.id, values);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+    }
     notify(editing ? "Product updated." : "Product added.");
     setDraft(null);
   };
@@ -200,9 +206,9 @@ export default function ProductManagement() {
                       {p.archived ? (
                         <button
                           className="text-link"
-                          onClick={() => {
-                            restoreProduct(p.id);
-                            notify(p.name + " restored.");
+                          onClick={async () => {
+                            const result = await restoreProduct(p.id);
+                            notify(result.ok ? p.name + " restored." : result.error);
                           }}
                         >
                           Restore
@@ -211,11 +217,13 @@ export default function ProductManagement() {
                         <button
                           className="icon-button"
                           aria-label={`Archive ${p.name} from ${p.supplier}`}
-                          onClick={() => {
-                            archiveProduct(p.id);
+                          onClick={async () => {
+                            const result = await archiveProduct(p.id);
                             notify(
-                              p.name +
-                                " archived. Restore it from the Archived tab.",
+                              result.ok
+                                ? p.name +
+                                  " archived. Restore it from the Archived tab."
+                                : result.error,
                             );
                           }}
                         >

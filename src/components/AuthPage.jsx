@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { assetUrl } from "../utils/assets";
 import { useSession } from "../context/SessionContext";
-import { getAccounts, saveAccount } from "../utils/accounts";
 import { useHashRoute } from "../hooks/useHashRoute";
 import BrandMark from "./BrandMark";
 import Icon from "./Icon";
 export default function AuthPage({ mode = "login" }) {
   const { params, navigate } = useHashRoute();
-  const { login, register, refreshUser } = useSession();
+  const { login, register, setupOwner, hasOwner, usingFirebase } = useSession();
   const accountRole = ["staff", "owner"].includes(params.role)
     ? params.role
     : "customer";
@@ -23,7 +22,6 @@ export default function AuthPage({ mode = "login" }) {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const hasOwner = getAccounts().some((a) => a.role === "owner");
   const title = setup
     ? "Set up your owner account"
     : signup
@@ -49,8 +47,7 @@ export default function AuthPage({ mode = "login" }) {
           setError("An owner account already exists. Please log in.");
           return;
         }
-        result = await saveAccount({ ...form, role: "owner" });
-        if (result.ok) refreshUser(result.account.id);
+        result = await setupOwner(form);
       } else
         result = signup
           ? await register(form)
@@ -114,6 +111,12 @@ export default function AuthPage({ mode = "login" }) {
               </a>
             ))}
           </div>
+        )}
+        {setup && usingFirebase && (
+          <p className="form-error" role="status">
+            The first owner profile is assigned securely in Firebase, not from
+            this public form. Follow the owner setup step after deployment.
+          </p>
         )}
         <form onSubmit={submit}>
           {(signup || setup) && (
@@ -236,7 +239,9 @@ export default function AuthPage({ mode = "login" }) {
         )}
         <p className="auth-local">
           <Icon name="lock" size={13} />
-          Preview accounts are saved on this device.
+          {usingFirebase
+            ? "Firebase accounts are shared securely across devices."
+            : "Preview accounts are saved on this device."}
         </p>
         <a className="text-link" href="#catalog">
           Continue browsing <Icon name="arrow" size={15} />

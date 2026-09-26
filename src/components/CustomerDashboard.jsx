@@ -36,9 +36,9 @@ export default function CustomerDashboard() {
     active?.orderType === "delivery"
       ? ["Pending", "Confirmed", "Preparing", "Out for Delivery", "Completed"]
       : ["Pending", "Confirmed", "Preparing", "Ready for Pickup", "Completed"];
-  const submitReview = (e) => {
+  const submitReview = async (e) => {
     e.preventDefault();
-    const result = saveReview(review.id, { rating, comment });
+    const result = await saveReview(review.id, { rating, comment });
     notify(result.ok ? "Thank you for your feedback!" : result.error);
     if (result.ok) setReview(null);
   };

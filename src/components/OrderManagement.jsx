@@ -20,6 +20,7 @@ export default function OrderManagement({ role = "owner" }) {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [updating, setUpdating] = useState(false);
   const visible = orders.filter(
     (o) =>
       (filter === "All" || o.status === filter) &&
@@ -36,9 +37,11 @@ export default function OrderManagement({ role = "owner" }) {
     setStatus(o.status);
     navigate("manage-orders", { order: o.id });
   };
-  const update = () => {
+  const update = async () => {
     const next = status || current.status;
-    const result = updateOrderStatus(current.id, next);
+    setUpdating(true);
+    const result = await updateOrderStatus(current.id, next);
+    setUpdating(false);
     notify(result.ok ? `${current.number} updated to ${next}.` : result.error);
     if (result.ok) close();
   };
@@ -210,8 +213,9 @@ export default function OrderManagement({ role = "owner" }) {
               className="btn-brand full-button"
               style={{ marginTop: 17 }}
               onClick={update}
+              disabled={updating}
             >
-              Update Status <Icon name="check" size={17} />
+              {updating ? "Updating…" : "Update Status"} <Icon name="check" size={17} />
             </button>
           )}
         </Modal>
