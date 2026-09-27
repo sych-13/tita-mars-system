@@ -60,10 +60,13 @@ service cloud.firestore {
 
     match /profiles/{profileId} {
       allow read: if signedIn() && (request.auth.uid == profileId || isOwner());
-      allow create: if signedIn() &&
-        request.auth.uid == profileId &&
-        request.resource.data.role == 'customer' &&
-        request.resource.data.active == true;
+      allow create: if (isOwner() &&
+          request.resource.data.role == 'staff' &&
+          request.resource.data.active == true) ||
+        (signedIn() &&
+          request.auth.uid == profileId &&
+          request.resource.data.role == 'customer' &&
+          request.resource.data.active == true);
       allow update: if isOwner() ||
         (signedIn() &&
           request.auth.uid == profileId &&

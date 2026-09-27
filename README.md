@@ -52,7 +52,7 @@ The GitHub Pages workflow uses these values only during the production build. A 
 
 ### First owner and staff roles
 
-Customer registration is public. Owner and staff roles are deliberately not self-assignable. Create each privileged account in Firebase Authentication with Email/Password, then use the Firebase console to create the matching `profiles/{Firebase Auth UID}` document in Firestore:
+Customer registration is public, while owner and staff roles are deliberately not self-assignable. Create the first owner in Firebase Authentication, then create the matching `profiles/{Firebase Auth UID}` document in Firestore:
 
 ```json
 {
@@ -67,7 +67,7 @@ Customer registration is public. Owner and staff roles are deliberately not self
 }
 ```
 
-Use `"staff"` for staff profiles. This one-time privileged setup prevents a public customer from granting themselves admin access. A future server-side staff-invite function can replace the console-only role assignment.
+After the first owner signs in, staff accounts can be created from **Owner Dashboard → Staff → Add Staff**. The app creates the Firebase Authentication user and its owner-protected `staff` profile together. Deactivated staff profiles cannot access the staff workspace.
 
 ## Verification
 

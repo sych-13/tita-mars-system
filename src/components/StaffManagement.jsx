@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
-import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query as firestoreQuery,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 import { getAccounts, saveAccount, ACCOUNT_KEY } from "../utils/accounts";
 import { writeStorage } from "../utils/storage";
-import { firestore } from "../lib/firebase";
+import { createStaffAuthUser, firestore } from "../lib/firebase";
 import { useShop } from "../context/ShopContext";
 import { useSession } from "../context/SessionContext";
 import DashboardLayout from "../layouts/DashboardLayout";
@@ -10,7 +18,7 @@ import Icon from "./Icon";
 import Modal from "./Modal";
 export default function StaffManagement() {
   const [accounts, setAccounts] = useState(getAccounts);
-  const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,38 +34,84 @@ export default function StaffManagement() {
       return undefined;
     }
     return onSnapshot(
-      query(collection(firestore, "profiles"), where("role", "==", "staff")),
+      firestoreQuery(
+        collection(firestore, "profiles"),
+        where("role", "==", "staff"),
+      ),
       (snapshot) =>
         setAccounts(
           snapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
         ),
+      () => setError("Unable to load staff accounts."),
     );
   }, [user, usingFirebase]);
   const staff = accounts.filter(
     (a) =>
       a.role === "staff" &&
-      `${a.name} ${a.email}`.toLowerCase().includes(query.toLowerCase()),
+      `${a.name} ${a.email}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()),
   );
   const save = async (e) => {
     e.preventDefault();
+    setError("");
+    if (!draft.id && draft.password !== draft.confirm) {
+      setError("The passwords do not match.");
+      return;
+    }
     setBusy(true);
     let result;
     if (usingFirebase && firestore) {
       try {
-        await updateDoc(doc(firestore, "profiles", draft.id), {
-          name: draft.name.trim(),
-          phone: draft.phone?.trim() || "",
-          updatedAt: new Date().toISOString(),
-        });
+        if (draft.id) {
+          await updateDoc(doc(firestore, "profiles", draft.id), {
+            name: draft.name.trim(),
+            phone: draft.phone?.trim() || "",
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          let staffAuthAccount;
+          try {
+            staffAuthAccount = await createStaffAuthUser(
+              draft.email,
+              draft.password,
+            );
+            const timestamp = new Date().toISOString();
+            await setDoc(doc(firestore, "profiles", staffAuthAccount.uid), {
+              name: draft.name.trim(),
+              email: staffAuthAccount.email,
+              phone: draft.phone?.trim() || "",
+              address: "",
+              role: "staff",
+              active: true,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            });
+            await staffAuthAccount.finish().catch(() => {});
+          } catch (caught) {
+            if (staffAuthAccount)
+              await staffAuthAccount.discard().catch(() => {});
+            throw caught;
+          }
+        }
         result = { ok: true };
       } catch (caught) {
+        const messages = {
+          "auth/email-already-in-use":
+            "This email already has a Firebase account.",
+          "auth/invalid-email": "Enter a valid email address.",
+          "auth/weak-password": "Use a password with at least 8 characters.",
+          "auth/operation-not-allowed":
+            "Email/password sign-in is not enabled in Firebase.",
+        };
         result = {
           ok: false,
           error:
-            caught?.code === "permission-denied" ||
+            messages[caught?.code] ||
+            (caught?.code === "permission-denied" ||
             caught?.code === "firestore/permission-denied"
-              ? "Only the owner can edit staff profiles."
-              : "Unable to save this staff profile.",
+              ? "Only the owner can create or edit staff profiles."
+              : "Unable to save this staff profile."),
         };
       }
     } else result = await saveAccount({ ...draft, role: "staff" }, draft.id);
@@ -102,34 +156,23 @@ export default function StaffManagement() {
           <h1>Staff Management</h1>
           <p>Manage the people who keep Tita Mars running.</p>
         </div>
-        {usingFirebase ? (
-          <a
-            className="btn-brand"
-            href="https://console.firebase.google.com/project/tita-mars-system-202609/authentication/users"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Icon name="users" size={17} />
-            Add staff in Firebase
-          </a>
-        ) : (
-          <button
-            className="btn-brand"
-            onClick={() => {
-              setDraft({
-                name: "",
-                email: "",
-                password: "",
-                phone: "",
-                active: true,
-              });
-              setError("");
-            }}
-          >
-            <Icon name="plus" size={17} />
-            Add Staff
-          </button>
-        )}
+        <button
+          className="btn-brand"
+          onClick={() => {
+            setDraft({
+              name: "",
+              email: "",
+              password: "",
+              confirm: "",
+              phone: "",
+              active: true,
+            });
+            setError("");
+          }}
+        >
+          <Icon name="plus" size={17} />
+          Add Staff
+        </button>
       </header>
       <section className="simple-card">
         <div className="table-toolbar">
@@ -141,8 +184,8 @@ export default function StaffManagement() {
             <input
               aria-label="Search staff"
               placeholder="Search staff..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </label>
         </div>
@@ -204,9 +247,7 @@ export default function StaffManagement() {
             <Icon name="users" size={38} />
             <h3>Your team starts here</h3>
             <p>
-              {usingFirebase
-                ? "Create their sign-in and staff profile in Firebase, then they will appear here."
-                : "Add a staff member so they can sign in and manage orders."}
+              Add a staff member so they can sign in and manage orders.
             </p>
           </div>
         )}
@@ -217,18 +258,19 @@ export default function StaffManagement() {
           onClose={() => setDraft(null)}
         >
           <form onSubmit={save}>
-            {(usingFirebase
-              ? [["name", "Full name", "text"], ["phone", "Mobile number", "tel"]]
-              : [
-                  ["name", "Full name", "text"],
-                  ["email", "Email address", "email"],
-                  ["phone", "Mobile number", "tel"],
-                  [
-                    "password",
-                    draft.id ? "New password (optional)" : "Password",
-                    "password",
-                  ],
-                ]
+            {(
+              draft.id
+                ? [
+                    ["name", "Full name", "text"],
+                    ["phone", "Mobile number", "tel"],
+                  ]
+                : [
+                    ["name", "Full name", "text"],
+                    ["email", "Email address", "email"],
+                    ["phone", "Mobile number", "tel"],
+                    ["password", "Temporary password", "password"],
+                    ["confirm", "Confirm password", "password"],
+                  ]
             ).map(([name, label, type]) => (
               <label key={name}>
                 {label}
@@ -237,9 +279,11 @@ export default function StaffManagement() {
                   required={
                     name === "name" ||
                     name === "email" ||
-                    (name === "password" && !draft.id)
+                    (!draft.id && ["password", "confirm"].includes(name))
                   }
-                  minLength={name === "password" ? 8 : undefined}
+                  minLength={
+                    ["password", "confirm"].includes(name) ? 8 : undefined
+                  }
                   value={draft[name]}
                   onChange={(e) =>
                     setDraft({ ...draft, [name]: e.target.value })
@@ -253,7 +297,11 @@ export default function StaffManagement() {
               </p>
             )}
             <button className="btn-brand full-button" disabled={busy}>
-              {busy ? "Saving…" : "Save staff member"}
+              {busy
+                ? "Saving…"
+                : draft.id
+                  ? "Save changes"
+                  : "Create staff account"}
             </button>
           </form>
         </Modal>

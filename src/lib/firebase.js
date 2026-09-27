@@ -1,5 +1,12 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+  getAuth,
+  inMemoryPersistence,
+  setPersistence,
+  signOut,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -23,3 +30,29 @@ export const firebaseApp = firebaseConfigured
 export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 export const firestore = firebaseApp ? getFirestore(firebaseApp) : null;
 export const storage = firebaseApp ? getStorage(firebaseApp) : null;
+
+const STAFF_CREATOR_APP = "tita-mars-staff-creator";
+
+export async function createStaffAuthUser(email, password) {
+  if (!firebaseConfigured)
+    throw new Error("Firebase is not configured for this build.");
+
+  const existingApp = getApps().find((app) => app.name === STAFF_CREATOR_APP);
+  const app = existingApp || initializeApp(firebaseConfig, STAFF_CREATOR_APP);
+  const auth = getAuth(app);
+  await setPersistence(auth, inMemoryPersistence);
+  if (auth.currentUser) await signOut(auth);
+
+  const credential = await createUserWithEmailAndPassword(
+    auth,
+    email.trim().toLowerCase(),
+    password,
+  );
+
+  return {
+    uid: credential.user.uid,
+    email: credential.user.email || email.trim().toLowerCase(),
+    finish: () => signOut(auth),
+    discard: () => deleteUser(credential.user),
+  };
+}
