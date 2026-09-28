@@ -10,8 +10,14 @@ export default function ProductCatalog() {
   const { products } = useProducts();
   const { favorites } = useShop();
   const [sort, setSort] = useState("popular");
-  const [query, setQuery] = useState(params.q || "");
+  const query = params.q || "";
   const category = params.category || "All products";
+  const search = (value) => {
+    const next = { ...params };
+    if (value) next.q = value;
+    else delete next.q;
+    navigate("catalog", next);
+  };
   const filtered = useMemo(() => {
     const list = products.filter(
       (p) =>
@@ -22,13 +28,13 @@ export default function ProductCatalog() {
           (category === "Bakery" && p.category !== "Tita Mars Eatery")) &&
         `${p.name} ${p.supplier}`
           .toLowerCase()
-          .includes((params.q ?? query).toLowerCase()),
+          .includes(query.toLowerCase()),
     );
     if (sort === "low") list.sort((a, b) => a.price - b.price);
     if (sort === "high") list.sort((a, b) => b.price - a.price);
     if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
-  }, [products, params.favorites, favorites, category, params.q, query, sort]);
+  }, [products, params.favorites, favorites, category, query, sort]);
   return (
     <section className="catalog-page container">
       <div className="breadcrumb">
@@ -101,13 +107,9 @@ export default function ProductCatalog() {
             <Icon name="search" size={19} />
             <input
               aria-label="Search the menu"
-              value={params.q ?? query}
+              value={query}
               placeholder="Search your cravings..."
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (params.q !== undefined)
-                  navigate("catalog", { ...params, q: e.target.value });
-              }}
+              onChange={(e) => search(e.target.value)}
             />
           </label>
           <div className="product-grid">

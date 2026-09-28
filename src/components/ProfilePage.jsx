@@ -4,7 +4,7 @@ import { useShop } from "../context/ShopContext";
 import ThemeToggle from "./ThemeToggle";
 import Icon from "./Icon";
 export default function ProfilePage() {
-  const { user, updateProfile, role } = useSession();
+  const { user, updateProfile, role, usingFirebase } = useSession();
   const { notify } = useShop();
   const [form, setForm] = useState({
     name: user?.name || "",
@@ -76,9 +76,17 @@ export default function ProfilePage() {
                 name={name}
                 type={name === "email" ? "email" : "text"}
                 required={name === "name" || name === "email"}
+                readOnly={usingFirebase && name === "email"}
+                aria-readonly={usingFirebase && name === "email"}
                 value={form[name]}
                 onChange={(e) => setForm({ ...form, [name]: e.target.value })}
               />
+              {usingFirebase && name === "email" && (
+                <small className="field-help">
+                  Email changes require Firebase account verification and are
+                  not available from this form yet.
+                </small>
+              )}
             </label>
           ))}
         </div>

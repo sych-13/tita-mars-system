@@ -112,6 +112,16 @@ try {
     1,
   );
   pass("Supplier-separated Banana Loaf search and saved favorites");
+  clickText("All products", ".catalog-sidebar");
+  assert.equal(
+    evaluate('document.querySelectorAll(".product-card").length'),
+    22,
+  );
+  assert.equal(
+    evaluate("document.querySelector('[aria-label=\"Search the menu\"]').value"),
+    "",
+  );
+  pass("Changing catalog category clears the previous search filter");
   go("home");
   shot("home-light");
   click(".theme-toggle");
