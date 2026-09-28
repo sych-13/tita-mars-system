@@ -251,15 +251,68 @@ export default function AuthPage({ mode = "login" }) {
   );
 }
 export function ForgotPassword() {
+  const { resetPassword, usingFirebase } = useSession();
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    const result = await resetPassword(email);
+    setBusy(false);
+    if (result.ok) setSent(true);
+    else setError(result.error);
+  };
   return (
     <section className="page-section container narrow-page">
       <div className="simple-card">
         <Icon name="lock" size={36} />
         <h1>Forgot your password?</h1>
-        <p>
-          Ask the owner to reset your staff password. Customer email recovery
-          will be available when email service is connected.
-        </p>
+        {sent ? (
+          <p role="status">
+            If an account exists for <strong>{email.trim()}</strong>, Firebase
+            has sent its password-reset instructions. Check the inbox and spam
+            folder.
+          </p>
+        ) : (
+          <>
+            <p>
+              Enter the email used for your Customer, Staff, or Owner account.
+            </p>
+            <form onSubmit={submit}>
+              <label>
+                Email address
+                <input
+                  required
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                />
+              </label>
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button
+                className="btn-brand full-button"
+                disabled={busy || !usingFirebase}
+              >
+                {busy ? "Sending…" : "Send reset email"}
+                <Icon name="arrow" size={16} />
+              </button>
+            </form>
+            {!usingFirebase && (
+              <p className="form-error" role="status">
+                Password reset email requires the Firebase version of the app.
+              </p>
+            )}
+          </>
+        )}
         <a className="btn-brand" href="#login">
           Back to login <Icon name="arrow" size={16} />
         </a>

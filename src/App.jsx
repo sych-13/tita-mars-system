@@ -32,8 +32,19 @@ function CustomerPage({ children }) {
 }
 
 function AccessRequired({ allowed, children }) {
-  const { role } = useSession();
-  if (allowed.includes(role)) return children;
+  const { ready, role, user, usingFirebase } = useSession();
+  if (!ready)
+    return (
+      <CustomerPage>
+        <section className="access-page page-section">
+          <div className="container access-required">
+            <p className="eyebrow">Checking account access…</p>
+          </div>
+        </section>
+      </CustomerPage>
+    );
+  if (allowed.includes(role) && (!usingFirebase || user)) return children;
+  const loginRole = allowed.includes("owner") ? "owner" : "staff";
   return (
     <CustomerPage>
       <section className="access-page page-section">
@@ -43,9 +54,9 @@ function AccessRequired({ allowed, children }) {
           </span>
           <p className="eyebrow">Workspace access</p>
           <h1>This area needs a different role.</h1>
-          <p>Choose the Staff or Owner / Admin demo workspace to continue.</p>
-          <a className="btn-brand" href="#access">
-            Choose workspace <i className="fa-solid fa-arrow-right" />
+          <p>Sign in with an authorized {loginRole} account to continue.</p>
+          <a className="btn-brand" href={`#login?role=${loginRole}`}>
+            Sign in <i className="fa-solid fa-arrow-right" />
           </a>
         </div>
       </section>

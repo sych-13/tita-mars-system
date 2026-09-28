@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useShop } from "../context/ShopContext";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ThemeToggle from "./ThemeToggle";
@@ -6,6 +6,7 @@ import Icon from "./Icon";
 export default function SettingsPage() {
   const { settings, saveSettings, notify } = useShop();
   const [draft, setDraft] = useState(settings);
+  useEffect(() => setDraft(settings), [settings]);
   const save = async (e) => {
     e.preventDefault();
     const result = await saveSettings({

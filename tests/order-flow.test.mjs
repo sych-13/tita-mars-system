@@ -42,4 +42,5 @@ test("item quantities are positive integers and duplicate products aggregate", (
   assert.equal(result.quantities.get("eatery-rice"), 2);
   assert.equal(summarizeOrderItems([{ id: "eatery-rice", quantity: -1 }]).ok, false);
   assert.equal(summarizeOrderItems([{ id: "eatery-rice", quantity: 1.5 }]).ok, false);
+  assert.equal(summarizeOrderItems([{ id: "eatery-rice", quantity: 1001 }]).ok, false);
 });

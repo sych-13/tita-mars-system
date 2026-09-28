@@ -24,6 +24,7 @@ export default function ProductManagement() {
     addProduct,
     archiveProduct,
     restoreProduct,
+    usingFirebase,
   } = useProducts();
   const { notify } = useShop();
   const [query, setQuery] = useState("");
@@ -31,6 +32,7 @@ export default function ProductManagement() {
   const [view, setView] = useState("active");
   const [draft, setDraft] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileInput = useRef(null);
   const filtered = products.filter(
@@ -48,7 +50,11 @@ export default function ProductManagement() {
   };
   const change = (e) => {
     const { name, value, type, checked } = e.target;
-    setDraft({ ...draft, [name]: type === "checkbox" ? checked : value });
+    setDraft({
+      ...draft,
+      [name]: type === "checkbox" ? checked : value,
+      ...(name === "category" ? { supplier: value } : {}),
+    });
   };
   const save = async (e) => {
     e.preventDefault();
@@ -63,18 +69,14 @@ export default function ProductManagement() {
       price: Number(draft.price),
       stock: Number(draft.stock),
     };
-    if (!editing) {
-      const r = await addProduct(values);
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-    } else {
-      const r = await updateProduct(draft.id, values);
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
+    setSaving(true);
+    const result = editing
+      ? await updateProduct(draft.id, values)
+      : await addProduct(values);
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
     notify(editing ? "Product updated." : "Product added.");
     setDraft(null);
@@ -82,12 +84,21 @@ export default function ProductManagement() {
   const upload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (usingFirebase) {
+      setError(
+        "Paste a hosted image URL for now. Firebase Storage upload is not configured yet.",
+      );
+      e.target.value = "";
+      return;
+    }
     if (!file.type.startsWith("image/")) {
       setError("Please choose an image file.");
+      e.target.value = "";
       return;
     }
     if (file.size > 1500000) {
       setError("Choose an image smaller than 1.5 MB for this local preview.");
+      e.target.value = "";
       return;
     }
     const reader = new FileReader();
@@ -260,14 +271,16 @@ export default function ProductManagement() {
               <div>
                 <strong>Product image</strong>
                 <p>Choose a photo for your menu.</p>
-                <button
-                  className="btn-secondary"
-                  type="button"
-                  onClick={() => fileInput.current?.click()}
-                >
-                  <Icon name="upload" size={16} />
-                  Upload Image
-                </button>
+                {!usingFirebase && (
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    <Icon name="upload" size={16} />
+                    Upload Image
+                  </button>
+                )}
                 <input
                   ref={fileInput}
                   type="file"
@@ -286,6 +299,9 @@ export default function ProductManagement() {
                   disabled={editing}
                   value={draft.id}
                   onChange={change}
+                  pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,39}"
+                  maxLength="40"
+                  title="Use 2–40 letters, numbers, hyphens, or underscores"
                   placeholder="Unique product ID"
                 />
               </label>
@@ -316,7 +332,7 @@ export default function ProductManagement() {
                   required
                   name="supplier"
                   value={draft.supplier}
-                  onChange={change}
+                  readOnly
                 />
               </label>
               <label>
@@ -372,7 +388,9 @@ export default function ProductManagement() {
                 {error}
               </p>
             )}
-            <button className="btn-brand full-button">Save Product</button>
+            <button className="btn-brand full-button" disabled={saving}>
+              {saving ? "Saving…" : "Save Product"}
+            </button>
             {editing && (
               <small className="editor-meta">
                 Created {prettyDate(draft.createdAt)} · Updated{" "}

@@ -22,6 +22,7 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 - Pickup or Taytay/Cainta delivery, Cash or GCash selection, checkout, confirmation, order tracking and completed-order reviews.
 - Owner workspace: dashboard, product editor, archive/restore, inventory, reports, CSV export, staff management and settings.
 - Staff workspace: order queue, status updates, inventory monitoring and daily sales report.
+- Firebase email/password login, customer registration, password-reset emails, and protected role-based workspaces.
 - Role-aware return-to-workspace navigation from the storefront and safe modals that do not dismiss on outside clicks.
 - Light/dark themes, responsive layouts and temporary food images.
 
@@ -36,6 +37,8 @@ Finished products only are tracked. Pickup orders move through Pending → Confi
 The app is prepared for Firebase Authentication and Cloud Firestore. When the six `VITE_FIREBASE_*` variables are configured, customer accounts, profiles, products, orders, reviews, order status and completed-order inventory deductions are stored in Firebase and update connected screens in real time.
 
 The app retains a local preview fallback when Firebase variables are not available. Preview workspaces intentionally bypass login. Favorites and cart state remain browser-local for now.
+
+In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. Product IDs, stock, supplier/category matching, and store settings are validated before saving. The project does not have a Firebase Storage bucket yet, so product images currently use the bundled temporary images or a hosted image URL.
 
 ### Configure GitHub Pages
 

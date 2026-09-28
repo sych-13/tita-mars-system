@@ -7,8 +7,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { collection, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
-import { seedProducts } from "../data/products";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  runTransaction,
+  updateDoc,
+} from "firebase/firestore";
+import { catalogCategories, seedProducts } from "../data/products";
 import { imageForProduct } from "../data/productImages";
 import { firebaseConfigured, firestore } from "../lib/firebase";
 import { normalizeAssetUrl } from "../utils/assets";
@@ -18,6 +24,8 @@ import { readStorage, writeStorage } from "../utils/storage";
 const ProductContext = createContext();
 const STORAGE_KEY = "tita-mars-products-v2";
 const LOW_STOCK_LIMIT = 5;
+const PRODUCT_CATEGORIES = catalogCategories.slice(1);
+const PRODUCT_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,39}$/;
 
 const cloneSeedProducts = () => seedProducts.map((product) => ({ ...product }));
 const formatProduct = (product) => {
@@ -47,6 +55,23 @@ const productError = (error, fallback) =>
     ? "Your account does not have permission to change products."
     : fallback;
 
+const validateProduct = (product) => {
+  if (!PRODUCT_ID_PATTERN.test(product.id || ""))
+    return "Use 2–40 letters, numbers, hyphens, or underscores for the Product ID.";
+  if (!product.name?.trim()) return "Product name is required.";
+  if (!PRODUCT_CATEGORIES.includes(product.category))
+    return "Choose a valid product category.";
+  if (product.supplier !== product.category)
+    return "The supplier must match the selected product category.";
+  if (!Number.isFinite(Number(product.price)) || Number(product.price) < 0)
+    return "Enter a valid non-negative price.";
+  if (!Number.isSafeInteger(Number(product.stock)) || Number(product.stock) < 0)
+    return "Stock quantity must be a non-negative whole number.";
+  if (firebaseConfigured && product.image?.startsWith("data:"))
+    return "Paste a hosted image URL for now. Firebase Storage upload is not configured yet.";
+  return "";
+};
+
 export function ProductProvider({ children }) {
   const [products, setProducts] = useState(getInitialProducts);
   const productsRef = useRef(products);
@@ -65,12 +90,16 @@ export function ProductProvider({ children }) {
 
   useEffect(() => {
     if (!firebaseConfigured || !firestore) return undefined;
-    return onSnapshot(collection(firestore, "products"), (snapshot) => {
+    return onSnapshot(
+      collection(firestore, "products"),
+      (snapshot) => {
         const next = snapshot.docs
           .map((item) => formatProduct({ id: item.id, ...item.data() }))
           .sort((a, b) => a.id.localeCompare(b.id));
-        if (next.length) commitProducts(next);
-      });
+        commitProducts(next);
+      },
+      () => commitProducts([]),
+    );
   }, [commitProducts]);
 
   useEffect(() => {
@@ -83,11 +112,20 @@ export function ProductProvider({ children }) {
       if (!current) return { ok: false, error: "Product not found." };
       const resolvedChanges =
         typeof changes === "function" ? changes(current) : changes;
-      const next = formatProduct({
+      const candidate = {
         ...current,
         ...resolvedChanges,
+        id: current.id,
+        name: (resolvedChanges.name ?? current.name)?.trim(),
+        supplier: resolvedChanges.category ?? current.category,
+        description:
+          (resolvedChanges.description ?? current.description)?.trim().slice(0, 600) ||
+          "Available from Tita Mars.",
         updatedAt: new Date().toISOString(),
-      });
+      };
+      const validationError = validateProduct(candidate);
+      if (validationError) return { ok: false, error: validationError };
+      const next = formatProduct(candidate);
       if (next.stock === 0) next.available = false;
 
       if (firebaseConfigured && firestore) {
@@ -109,39 +147,48 @@ export function ProductProvider({ children }) {
 
   const addProduct = useCallback(
     async (data) => {
-      const id = data.id?.trim() || `TM-${Date.now().toString().slice(-6)}`;
+      const id =
+        data.id?.trim().toUpperCase() || `TM-${Date.now().toString().slice(-6)}`;
       if (productsRef.current.some((product) => product.id === id))
         return { ok: false, error: "That Product ID is already in use." };
       const timestamp = new Date().toISOString();
-      const product = formatProduct({
+      const candidate = {
         id,
         name: data.name?.trim(),
         category: data.category,
-        supplier: data.supplier?.trim(),
-        price: Math.max(0, Number(data.price) || 0),
-        stock: Math.max(0, Number(data.stock) || 0),
+        supplier: data.category,
+        price: Number(data.price),
+        stock: Number(data.stock),
         available: data.available !== false,
         archived: false,
         image: data.image?.trim() || seedProducts[0].image,
-        description: data.description?.trim() || "Available from Tita Mars.",
+        description:
+          data.description?.trim().slice(0, 600) || "Available from Tita Mars.",
         createdAt: timestamp,
         updatedAt: timestamp,
-      });
-      if (!product.name || !product.supplier)
-        return { ok: false, error: "Product name and supplier are required." };
-      if (firebaseConfigured && product.image.startsWith("data:"))
-        return {
-          ok: false,
-          error:
-            "Image file uploads need Firebase Storage. Use an image URL for now.",
-        };
+      };
+      const validationError = validateProduct(candidate);
+      if (validationError) return { ok: false, error: validationError };
+      const product = formatProduct(candidate);
 
       if (firebaseConfigured && firestore) {
         try {
-          await setDoc(doc(firestore, "products", id), product);
+          await runTransaction(firestore, async (transaction) => {
+            const productRef = doc(firestore, "products", id);
+            const snapshot = await transaction.get(productRef);
+            if (snapshot.exists())
+              throw new Error("That Product ID is already in use.");
+            transaction.set(productRef, product);
+          });
           return { ok: true, product };
         } catch (error) {
-          return { ok: false, error: productError(error, "Unable to add this product.") };
+          return {
+            ok: false,
+            error:
+              error?.message === "That Product ID is already in use."
+                ? error.message
+                : productError(error, "Unable to add this product."),
+          };
         }
       }
 

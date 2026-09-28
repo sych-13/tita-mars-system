@@ -112,11 +112,79 @@ service cloud.firestore {
         request.resource.data.inventoryDeductedAt == null;
     }
 
+    function validProduct(productId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'name', 'category', 'supplier', 'price', 'stock',
+          'available', 'archived', 'image', 'description', 'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.id == productId &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.category in [
+          'Tita Mars Eatery', "Ribbonette's Bakeshoppe", 'Gabbis Bakeshop'
+        ] &&
+        request.resource.data.supplier == request.resource.data.category &&
+        request.resource.data.price is number &&
+        request.resource.data.price >= 0 &&
+        request.resource.data.stock is int &&
+        request.resource.data.stock >= 0 &&
+        request.resource.data.available is bool &&
+        request.resource.data.archived is bool &&
+        request.resource.data.image is string &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 600 &&
+        request.resource.data.createdAt is string &&
+        request.resource.data.updatedAt is string &&
+        !(request.resource.data.stock == 0 &&
+          request.resource.data.available == true) &&
+        !(request.resource.data.archived == true &&
+          request.resource.data.available == true);
+    }
+
+    function validStoreSettings() {
+      return request.resource.data.keys().hasOnly([
+          'name', 'phone', 'email', 'address', 'hours', 'deliveryFee',
+          'gcashName', 'gcashNumber'
+        ]) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.phone is string &&
+        request.resource.data.email is string &&
+        request.resource.data.address is string &&
+        request.resource.data.address.size() > 0 &&
+        request.resource.data.hours is string &&
+        request.resource.data.hours.size() > 0 &&
+        request.resource.data.deliveryFee is int &&
+        request.resource.data.deliveryFee >= 0 &&
+        request.resource.data.gcashName is string &&
+        request.resource.data.gcashNumber is string;
+    }
+
+    function validProfile() {
+      return request.resource.data.keys().hasOnly([
+          'name', 'email', 'phone', 'address', 'role', 'active', 'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() > 0 &&
+        request.resource.data.phone is string &&
+        request.resource.data.address is string &&
+        request.resource.data.role in ['customer', 'staff', 'owner'] &&
+        request.resource.data.active is bool &&
+        request.resource.data.createdAt is string &&
+        request.resource.data.updatedAt is string;
+    }
+
     match /products/{productId} {
       allow read: if true;
-      allow create, delete: if isOwner();
-      allow update: if isOwner() ||
+      allow create: if isOwner() && validProduct(productId);
+      allow delete: if isOwner();
+      allow update: if (isOwner() && validProduct(productId)) ||
         (isStaff() &&
+          validProduct(productId) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['stock', 'available', 'updatedAt']) &&
           request.resource.data.stock is int &&
@@ -133,14 +201,19 @@ service cloud.firestore {
     match /profiles/{profileId} {
       allow read: if signedIn() && (request.auth.uid == profileId || isOwner());
       allow create: if (isOwner() &&
+          validProfile() &&
           request.resource.data.role == 'staff' &&
           request.resource.data.active == true) ||
         (signedIn() &&
+          validProfile() &&
           request.auth.uid == profileId &&
           request.resource.data.role == 'customer' &&
           request.resource.data.active == true);
-      allow update: if isOwner() ||
+      allow update: if (isOwner() &&
+          validProfile() &&
+          request.resource.data.role == resource.data.role) ||
         (signedIn() &&
+          validProfile() &&
           request.auth.uid == profileId &&
           request.resource.data.role == resource.data.role &&
           request.resource.data.active == resource.data.active &&
@@ -176,7 +249,7 @@ service cloud.firestore {
 
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if isOwner();
+      allow write: if isOwner() && settingId == 'store' && validStoreSettings();
     }
   }
 }

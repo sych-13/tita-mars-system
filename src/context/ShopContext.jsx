@@ -41,7 +41,31 @@ export function ShopProvider({ children }) {
     () => ({
       settings,
       saveSettings: async (next) => {
-        const values = { ...settings, ...next };
+        const deliveryFee = Number(next.deliveryFee ?? settings.deliveryFee);
+        if (!Number.isInteger(deliveryFee) || deliveryFee < 0)
+          return {
+            ok: false,
+            error: "Delivery fee must be a non-negative whole number.",
+          };
+        const values = {
+          name: String(next.name ?? settings.name).trim().slice(0, 120),
+          phone: String(next.phone ?? settings.phone).trim().slice(0, 30),
+          email: String(next.email ?? settings.email).trim().slice(0, 160),
+          address: String(next.address ?? settings.address).trim().slice(0, 300),
+          hours: String(next.hours ?? settings.hours).trim().slice(0, 120),
+          deliveryFee,
+          gcashName: String(next.gcashName ?? settings.gcashName)
+            .trim()
+            .slice(0, 120),
+          gcashNumber: String(next.gcashNumber ?? settings.gcashNumber)
+            .trim()
+            .slice(0, 30),
+        };
+        if (!values.name || !values.address || !values.hours)
+          return {
+            ok: false,
+            error: "Business name, hours, and pickup address are required.",
+          };
         if (firebaseConfigured && firestore) {
           try {
             await setDoc(doc(firestore, "settings", "store"), values, {

@@ -4,11 +4,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as signOutFromFirebase,
   updateProfile as updateFirebaseProfile,
@@ -31,6 +33,11 @@ const messageForAuthError = (error, fallback) => {
       return "The email or password is incorrect.";
     case "auth/weak-password":
       return "Use a password with at least 8 characters.";
+    case "auth/invalid-email":
+    case "auth/missing-email":
+      return "Enter a valid email address.";
+    case "auth/network-request-failed":
+      return "Check your internet connection and try again.";
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a moment, then try again.";
     case "permission-denied":
@@ -54,6 +61,7 @@ const profileFor = (authUser, profile) => ({
 });
 
 export function SessionProvider({ children }) {
+  const registrationInProgress = useRef(false);
   const [user, setUser] = useState(() => {
     if (firebaseConfigured) return null;
     const saved = readStorage(SESSION_KEY, null);
@@ -67,7 +75,7 @@ export function SessionProvider({ children }) {
     () => localStorage.getItem("tita-mars-role") || "customer",
   );
   const [ready, setReady] = useState(!firebaseConfigured);
-  const role = user?.role || demoRole;
+  const role = user?.role || (firebaseConfigured ? "customer" : demoRole);
 
   useEffect(() => {
     if (!firebaseConfigured || !firebaseAuth || !firestore) return undefined;
@@ -83,6 +91,10 @@ export function SessionProvider({ children }) {
         doc(firestore, "profiles", authUser.uid),
         (snapshot) => {
           if (!snapshot.exists() || snapshot.data().active === false) {
+            if (!snapshot.exists() && registrationInProgress.current) {
+              setReady(false);
+              return;
+            }
             setUser(null);
             setDemoRole("customer");
             signOutFromFirebase(firebaseAuth).catch(() => {});
@@ -178,6 +190,7 @@ export function SessionProvider({ children }) {
 
   const register = useCallback(async (data) => {
     if (firebaseConfigured && firebaseAuth && firestore) {
+      registrationInProgress.current = true;
       try {
         const credential = await createUserWithEmailAndPassword(
           firebaseAuth,
@@ -198,12 +211,14 @@ export function SessionProvider({ children }) {
         await setDoc(doc(firestore, "profiles", credential.user.uid), profile);
         await updateFirebaseProfile(credential.user, {
           displayName: profile.name,
-        });
+        }).catch(() => {});
         const account = profileFor(credential.user, profile);
         setUser(account);
         setDemoRole("customer");
         return { ok: true, account };
       } catch (error) {
+        if (firebaseAuth.currentUser)
+          await signOutFromFirebase(firebaseAuth).catch(() => {});
         return {
           ok: false,
           error: messageForAuthError(
@@ -211,6 +226,8 @@ export function SessionProvider({ children }) {
             "Unable to create this account. Please try again.",
           ),
         };
+      } finally {
+        registrationInProgress.current = false;
       }
     }
 
@@ -220,6 +237,30 @@ export function SessionProvider({ children }) {
       setDemoRole("customer");
     }
     return result;
+  }, []);
+
+  const resetPassword = useCallback(async (email) => {
+    const normalizedEmail = email?.trim().toLowerCase();
+    if (!normalizedEmail)
+      return { ok: false, error: "Enter your email address." };
+    if (!firebaseConfigured || !firebaseAuth)
+      return {
+        ok: false,
+        error: "Password reset email is available in the Firebase version.",
+      };
+    try {
+      await sendPasswordResetEmail(firebaseAuth, normalizedEmail);
+      return { ok: true };
+    } catch (error) {
+      if (error?.code === "auth/user-not-found") return { ok: true };
+      return {
+        ok: false,
+        error: messageForAuthError(
+          error,
+          "Unable to send the reset email. Please try again.",
+        ),
+      };
+    }
   }, []);
 
   const setupOwner = useCallback(async (data) => {
@@ -282,7 +323,9 @@ export function SessionProvider({ children }) {
       register,
       setupOwner,
       updateProfile,
+      resetPassword,
       setRole: (next) => {
+        if (firebaseConfigured) return;
         setUser(null);
         setDemoRole(next);
       },
@@ -297,10 +340,19 @@ export function SessionProvider({ children }) {
         setUser(getAccounts().find((entry) => entry.id === id) || null);
       },
       hasOwner: firebaseConfigured
-        ? false
+        ? true
         : getAccounts().some((account) => account.role === "owner"),
     }),
-    [login, ready, register, role, setupOwner, updateProfile, user],
+    [
+      login,
+      ready,
+      register,
+      resetPassword,
+      role,
+      setupOwner,
+      updateProfile,
+      user,
+    ],
   );
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

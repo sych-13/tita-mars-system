@@ -44,9 +44,9 @@ export default function InventoryManagement({ role = "owner" }) {
         new Date(b.inventoryDeductedAt) - new Date(a.inventoryDeductedAt),
     )
     .flatMap((order) =>
-      order.items.map((item) => ({
+      order.items.map((item, index) => ({
         ...item,
-        key: order.id + "-" + item.id,
+        key: order.id + "-" + item.id + "-" + index,
         order: order.number,
         at: order.inventoryDeductedAt,
       })),
@@ -56,7 +56,16 @@ export default function InventoryManagement({ role = "owner" }) {
   const restock = async (event) => {
     event.preventDefault();
     const amount = Number(quantity);
-    if (!current || !Number.isInteger(amount) || amount < 1) return;
+    if (
+      !current ||
+      !Number.isSafeInteger(amount) ||
+      amount < 1 ||
+      amount > 100000 ||
+      !Number.isSafeInteger(current.stock + amount)
+    ) {
+      notify("Enter a restock quantity from 1 to 100,000.");
+      return;
+    }
     const result = await updateProduct(current.id, (product) => ({
       stock: product.stock + amount,
       available: product.stock === 0 ? true : product.available,
@@ -283,6 +292,7 @@ export default function InventoryManagement({ role = "owner" }) {
                 autoFocus
                 type="number"
                 min="1"
+                max="100000"
                 step="1"
                 required
                 value={quantity}

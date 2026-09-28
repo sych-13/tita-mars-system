@@ -24,13 +24,17 @@ const roles = [
   ],
 ];
 export default function AccessPage() {
-  const { setRole } = useSession();
+  const { setRole, usingFirebase } = useSession();
   return (
     <section className="container access-page">
       <header className="access-heading">
         <p className="eyebrow">Welcome to Tita Mars</p>
         <h1>A place for everyone.</h1>
-        <p>Sign in to your account, or explore a workspace preview.</p>
+        <p>
+          {usingFirebase
+            ? "Sign in to the account assigned to you."
+            : "Sign in to your account, or explore a workspace preview."}
+        </p>
       </header>
       <div className="access-grid">
         {roles.map(([role, label, copy, icon, destination]) => (
@@ -43,15 +47,17 @@ export default function AccessPage() {
             <a className="btn-brand" href={`#login?role=${role}`}>
               Login <Icon name="arrow" size={16} />
             </a>
-            <button
-              className="text-link preview-link"
-              onClick={() => {
-                setRole(role);
-                window.location.hash = destination;
-              }}
-            >
-              Explore preview
-            </button>
+            {!usingFirebase && (
+              <button
+                className="text-link preview-link"
+                onClick={() => {
+                  setRole(role);
+                  window.location.hash = destination;
+                }}
+              >
+                Explore preview
+              </button>
+            )}
           </article>
         ))}
       </div>

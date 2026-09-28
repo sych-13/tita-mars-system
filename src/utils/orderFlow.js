@@ -54,8 +54,9 @@ export function summarizeOrderItems(items) {
       typeof item?.id !== "string" ||
       !item.id ||
       item.id.includes("/") ||
-      !Number.isInteger(item.quantity) ||
-      item.quantity < 1
+      !Number.isSafeInteger(item.quantity) ||
+      item.quantity < 1 ||
+      item.quantity > 1000
     )
       return { ok: false };
     quantities.set(item.id, (quantities.get(item.id) || 0) + item.quantity);
