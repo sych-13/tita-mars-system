@@ -29,7 +29,7 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 
 The seed catalog contains the exact 22 approved products with unchanged names, prices and suppliers. Both Banana Loaf products remain separate: Ribbonette's is PHP 170 and Gabbis is PHP 160. Initial stock is 20 per product.
 
-Finished products only are tracked. Stock is deducted once when an order becomes Completed; pending, confirmed, preparing, ready-for-pickup and out-for-delivery orders do not deduct stock. Completed orders are locked. Archived, unavailable and out-of-stock products cannot be ordered.
+Finished products only are tracked. Pickup orders move through Pending → Confirmed → Preparing → Ready for Pickup → Completed; delivery orders use Out for Delivery instead. Stock is deducted atomically and only once when an order becomes Completed. Earlier statuses do not deduct stock, while Completed and Cancelled orders are locked. Archived, unavailable and out-of-stock products cannot be ordered.
 
 ## Firebase data mode
 

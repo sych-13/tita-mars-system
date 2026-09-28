@@ -4,6 +4,8 @@ import { readStorage, writeStorage } from "../utils/storage";
 
 const CartContext = createContext();
 const STORAGE_KEY = "tita-mars-cart";
+const validQuantity = (value, stock) =>
+  Math.max(1, Math.min(Math.trunc(Number(value) || 1), stock));
 
 export function CartProvider({ children }) {
   const { products } = useProducts();
@@ -22,7 +24,7 @@ export function CartProvider({ children }) {
         )
           return [];
         return [
-          { ...product, quantity: Math.min(item.quantity, product.stock) },
+          { ...product, quantity: validQuantity(item.quantity, product.stock) },
         ];
       }),
     );
@@ -46,7 +48,10 @@ export function CartProvider({ children }) {
           item.id === liveProduct.id
             ? {
                 ...liveProduct,
-                quantity: Math.min(item.quantity + 1, liveProduct.stock),
+                quantity: validQuantity(
+                  Number(item.quantity) + 1,
+                  liveProduct.stock,
+                ),
               }
             : item,
         );
@@ -60,7 +65,7 @@ export function CartProvider({ children }) {
         return current.filter((item) => item.id !== id);
       return current.map((item) =>
         item.id === id
-          ? { ...product, quantity: Math.min(quantity, product.stock) }
+          ? { ...product, quantity: validQuantity(quantity, product.stock) }
           : item,
       );
     });

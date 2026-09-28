@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
   orderStatuses,
-  statusesForOrder,
+  statusChangesForOrder,
   useOrders,
 } from "../context/OrdersContext";
 import { useProducts } from "../context/ProductContext";
@@ -186,10 +186,10 @@ export default function OrderManagement({ role = "owner" }) {
             Status
             <select
               value={status || current.status}
-              disabled={current.status === "Completed"}
+              disabled={["Completed", "Cancelled"].includes(current.status)}
               onChange={(e) => setStatus(e.target.value)}
             >
-              {statusesForOrder(current).map((s) => (
+              {statusChangesForOrder(current).map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
@@ -208,14 +208,24 @@ export default function OrderManagement({ role = "owner" }) {
                 ? prettyDate(current.inventoryDeductedAt)
                 : "in legacy records"}
             </p>
+          ) : current.status === "Cancelled" ? (
+            <p className="completion-note">
+              <Icon name="close" size={17} />
+              Cancelled · No inventory was deducted.
+            </p>
           ) : (
             <button
               className="btn-brand full-button"
               style={{ marginTop: 17 }}
               onClick={update}
-              disabled={updating}
+              disabled={updating || status === current.status}
             >
-              {updating ? "Updating…" : "Update Status"} <Icon name="check" size={17} />
+              {updating
+                ? "Updating…"
+                : status === current.status
+                  ? "Select next status"
+                  : "Update Status"}{" "}
+              <Icon name="check" size={17} />
             </button>
           )}
         </Modal>

@@ -13,10 +13,15 @@ import {
   onSnapshot,
   query,
   runTransaction,
-  setDoc,
   where,
 } from "firebase/firestore";
 import { firebaseConfigured, firestore } from "../lib/firebase";
+import {
+  orderStatuses,
+  statusChangesForOrder,
+  statusesForOrder,
+  summarizeOrderItems,
+} from "../utils/orderFlow";
 import { readStorage, writeStorage } from "../utils/storage";
 import { useProducts } from "./ProductContext";
 import { useSession } from "./SessionContext";
@@ -24,34 +29,7 @@ import { useSession } from "./SessionContext";
 const OrdersContext = createContext();
 const STORAGE_KEY = "tita-mars-orders-v2";
 
-export const orderStatuses = [
-  "Pending",
-  "Confirmed",
-  "Preparing",
-  "Ready for Pickup",
-  "Out for Delivery",
-  "Completed",
-  "Cancelled",
-];
-
-export const statusesForOrder = (order) =>
-  order?.orderType === "delivery"
-    ? [
-        "Pending",
-        "Confirmed",
-        "Preparing",
-        "Out for Delivery",
-        "Completed",
-        "Cancelled",
-      ]
-    : [
-        "Pending",
-        "Confirmed",
-        "Preparing",
-        "Ready for Pickup",
-        "Completed",
-        "Cancelled",
-      ];
+export { orderStatuses, statusChangesForOrder, statusesForOrder };
 
 const loadLegacyOrders = () => {
   const saved = readStorage(STORAGE_KEY, null);
@@ -156,6 +134,26 @@ export function OrdersProvider({ children }) {
     async (data) => {
       const validation = validateOrderItems(data.items);
       if (!validation.ok) return validation;
+      const customer = data.customer?.trim() || "";
+      const phone = data.phone?.trim() || "";
+      const address = data.address?.trim() || "";
+      if (!customer || !phone || (data.orderType === "delivery" && !address))
+        return {
+          ok: false,
+          error: "Complete the customer and delivery details first.",
+        };
+      if (!["pickup", "delivery"].includes(data.orderType))
+        return { ok: false, error: "Choose pickup or delivery." };
+      if (!["cash", "gcash"].includes(data.payment))
+        return { ok: false, error: "Choose Cash or GCash." };
+      if (
+        data.orderType === "delivery" &&
+        !["Taytay", "Cainta"].includes(data.deliveryArea)
+      )
+        return {
+          ok: false,
+          error: "Delivery is currently available only in Taytay and Cainta.",
+        };
       const timestamp = new Date().toISOString();
 
       if (firebaseConfigured && firestore) {
@@ -166,21 +164,87 @@ export function OrdersProvider({ children }) {
           };
         try {
           const orderRef = doc(collection(firestore, "orders"));
-          const order = {
-            ...data,
-            id: orderRef.id,
-            customerId: user.id,
-            customer: data.customer.trim(),
-            number: `TM-${orderRef.id
-              .replace(/[^a-z0-9]/gi, "")
-              .slice(-6)
-              .toUpperCase()}`,
-            status: "Pending",
-            createdAt: timestamp,
-            updatedAt: timestamp,
-            inventoryDeductedAt: null,
-          };
-          await setDoc(orderRef, order);
+          let order;
+          await runTransaction(firestore, async (transaction) => {
+            const productRefs = [...validation.required.keys()].map((id) =>
+              doc(firestore, "products", id),
+            );
+            const settingsRef = doc(firestore, "settings", "store");
+            const snapshots = await Promise.all([
+              ...productRefs.map((productRef) => transaction.get(productRef)),
+              transaction.get(settingsRef),
+            ]);
+            const settingsSnapshot = snapshots.pop();
+            const productSnapshots = snapshots;
+            const items = productSnapshots.map((snapshot, index) => {
+              const quantity = validation.required.get(productRefs[index].id);
+              if (!snapshot.exists())
+                throw new Error("A product in your cart no longer exists.");
+              const product = snapshot.data();
+              const price = Number(product.price);
+              if (
+                product.archived ||
+                product.available === false ||
+                !Number.isFinite(price) ||
+                price < 0 ||
+                Number(product.stock || 0) < quantity
+              )
+                throw new Error(
+                  "One or more items are no longer available in the requested quantity. Please review your cart.",
+                );
+              return {
+                id: productRefs[index].id,
+                name: product.name,
+                supplier: product.supplier,
+                category: product.category,
+                image: product.image,
+                price,
+                quantity,
+              };
+            });
+            const subtotal = items.reduce(
+              (sum, item) => sum + item.price * item.quantity,
+              0,
+            );
+            const configuredFee = Number(
+              settingsSnapshot.exists()
+                ? settingsSnapshot.data().deliveryFee
+                : 20,
+            );
+            const deliveryFee =
+              data.orderType === "delivery" && Number.isFinite(configuredFee)
+                ? Math.max(0, configuredFee)
+                : 0;
+            order = {
+              id: orderRef.id,
+              customerId: user.id,
+              customer: customer.slice(0, 120),
+              phone: phone.slice(0, 30),
+              email: data.email?.trim().toLowerCase().slice(0, 160) || "",
+              address:
+                data.orderType === "delivery"
+                  ? address.slice(0, 300)
+                  : "",
+              deliveryArea:
+                data.orderType === "delivery" ? data.deliveryArea : "",
+              notes: data.notes?.trim().slice(0, 600) || "",
+              orderType: data.orderType,
+              payment: data.payment,
+              subtotal,
+              deliveryFee,
+              total: subtotal + deliveryFee,
+              items,
+              number: `TM-${orderRef.id
+                .replace(/[^a-z0-9]/gi, "")
+                .slice(-6)
+                .toUpperCase()}`,
+              status: "Pending",
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              inventoryDeductedAt: null,
+            };
+            transaction.set(orderRef, order);
+          });
           return { ok: true, order };
         } catch (error) {
           return { ok: false, error: orderError(error, "Unable to place your order.") };
@@ -219,31 +283,34 @@ export function OrdersProvider({ children }) {
             const orderSnapshot = await transaction.get(orderRef);
             if (!orderSnapshot.exists()) throw new Error("Order not found.");
             const current = normalizeOrder({ id: orderSnapshot.id, ...orderSnapshot.data() });
-            if (!statusesForOrder(current).includes(status))
+            if (!statusChangesForOrder(current).includes(status))
               throw new Error(
-                `That status does not apply to this ${current.orderType === "delivery" ? "delivery" : "pickup"} order.`,
+                `Move this order to its next ${current.orderType === "delivery" ? "delivery" : "pickup"} status first.`,
               );
-            if (current.status === "Completed" && status !== "Completed")
-              throw new Error("Completed orders are locked to protect inventory records.");
+            if (
+              ["Completed", "Cancelled"].includes(current.status) &&
+              status !== current.status
+            )
+              throw new Error(
+                `${current.status} orders are locked to protect order and inventory records.`,
+              );
 
             const timestamp = new Date().toISOString();
             const changes = { status, updatedAt: timestamp };
             if (status === "Completed" && !current.inventoryDeductedAt) {
-              const required = current.items.reduce(
-                (all, item) => ({
-                  ...all,
-                  [item.id]: (all[item.id] || 0) + Number(item.quantity || 0),
-                }),
-                {},
-              );
-              const productRefs = Object.keys(required).map((productId) =>
-                doc(firestore, "products", productId),
+              const summary = summarizeOrderItems(current.items);
+              if (!summary.ok)
+                throw new Error(
+                  "This order contains invalid items and cannot be completed.",
+                );
+              const productRefs = [...summary.quantities.keys()].map(
+                (productId) => doc(firestore, "products", productId),
               );
               const productSnapshots = await Promise.all(
                 productRefs.map((productRef) => transaction.get(productRef)),
               );
               productSnapshots.forEach((productSnapshot, index) => {
-                const quantity = required[productRefs[index].id];
+                const quantity = summary.quantities.get(productRefs[index].id);
                 if (
                   !productSnapshot.exists() ||
                   Number(productSnapshot.data().stock || 0) < quantity
@@ -255,7 +322,9 @@ export function OrdersProvider({ children }) {
               productSnapshots.forEach((productSnapshot, index) => {
                 const productRef = productRefs[index];
                 const product = productSnapshot.data();
-                const stock = Number(product.stock || 0) - required[productRef.id];
+                const stock =
+                  Number(product.stock || 0) -
+                  summary.quantities.get(productRef.id);
                 transaction.update(productRef, {
                   stock,
                   available: stock > 0 ? product.available !== false : false,
@@ -274,15 +343,18 @@ export function OrdersProvider({ children }) {
 
       const target = ordersRef.current.find((order) => order.id === id);
       if (!target) return { ok: false, error: "Order not found." };
-      if (!statusesForOrder(target).includes(status))
+      if (!statusChangesForOrder(target).includes(status))
         return {
           ok: false,
-          error: `That status does not apply to this ${target.orderType === "delivery" ? "delivery" : "pickup"} order.`,
+          error: `Move this order to its next ${target.orderType === "delivery" ? "delivery" : "pickup"} status first.`,
         };
-      if (target.status === "Completed" && status !== "Completed")
+      if (
+        ["Completed", "Cancelled"].includes(target.status) &&
+        status !== target.status
+      )
         return {
           ok: false,
-          error: "Completed orders are locked to protect inventory records.",
+          error: `${target.status} orders are locked to protect order and inventory records.`,
         };
 
       let deductedAt = target.inventoryDeductedAt;

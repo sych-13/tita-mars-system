@@ -12,6 +12,7 @@ import { seedProducts } from "../data/products";
 import { imageForProduct } from "../data/productImages";
 import { firebaseConfigured, firestore } from "../lib/firebase";
 import { normalizeAssetUrl } from "../utils/assets";
+import { summarizeOrderItems } from "../utils/orderFlow";
 import { readStorage, writeStorage } from "../utils/storage";
 
 const ProductContext = createContext();
@@ -165,20 +166,18 @@ export function ProductProvider({ children }) {
   );
 
   const validateOrderItems = useCallback((items) => {
-    if (!Array.isArray(items) || !items.length)
-      return { ok: false, error: "Your cart is empty." };
-    const required = items.reduce(
-      (all, item) => ({
-        ...all,
-        [item.id]: (all[item.id] || 0) + Number(item.quantity || 0),
-      }),
-      {},
-    );
-    const invalidItem = Object.entries(required).find(([id, quantity]) => {
+    const summary = summarizeOrderItems(items);
+    if (!summary.ok)
+      return {
+        ok: false,
+        error:
+          Array.isArray(items) && items.length
+            ? "Your cart contains an invalid item quantity."
+            : "Your cart is empty.",
+      };
+    const invalidItem = [...summary.quantities].find(([id, quantity]) => {
       const product = productsRef.current.find((item) => item.id === id);
       return (
-        !Number.isFinite(quantity) ||
-        quantity < 1 ||
         !product ||
         product.archived ||
         !product.available ||
@@ -191,7 +190,7 @@ export function ProductProvider({ children }) {
         error:
           "One or more items are no longer available in the requested quantity. Please review your cart.",
       };
-    return { ok: true, required };
+    return { ok: true, required: summary.quantities };
   }, []);
 
   const deductInventory = useCallback(
@@ -201,20 +200,12 @@ export function ProductProvider({ children }) {
           ok: false,
           error: "Inventory is recorded with the order transaction.",
         };
-      if (!Array.isArray(items) || !items.length)
+      const summary = summarizeOrderItems(items);
+      if (!summary.ok)
         return { ok: false, error: "This order has no items to deduct." };
-      const required = items.reduce(
-        (all, item) => ({
-          ...all,
-          [item.id]: (all[item.id] || 0) + Number(item.quantity || 0),
-        }),
-        {},
-      );
-      const invalidItem = Object.entries(required).find(([id, quantity]) => {
+      const invalidItem = [...summary.quantities].find(([id, quantity]) => {
         const product = productsRef.current.find((item) => item.id === id);
         return (
-          !Number.isFinite(quantity) ||
-          quantity < 1 ||
           !product ||
           product.stock < quantity
         );
@@ -228,7 +219,7 @@ export function ProductProvider({ children }) {
       const timestamp = new Date().toISOString();
       commitProducts((current) =>
         current.map((product) => {
-          const quantity = required[product.id] || 0;
+          const quantity = summary.quantities.get(product.id) || 0;
           if (!quantity) return product;
           const stock = product.stock - quantity;
           return {
