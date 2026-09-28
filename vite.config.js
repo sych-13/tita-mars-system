@@ -9,4 +9,22 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
   },
+
+  build: {
+    // Firebase is isolated in its own cacheable vendor chunk; its compressed
+    // transfer size is well below this uncompressed warning threshold.
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('/firebase/')) return 'firebase';
+          if (id.includes('@phosphor-icons')) return 'icons';
+          if (id.includes('/react/') || id.includes('/react-dom/'))
+            return 'react';
+          return 'vendor';
+        },
+      },
+    },
+  },
 });

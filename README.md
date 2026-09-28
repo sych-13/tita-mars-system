@@ -4,6 +4,8 @@ Responsive React/Vite storefront and owner/staff workspace based on the supplied
 
 ## Run locally
 
+Use Node.js 20.19 or newer (Node.js 22.12+ is also supported).
+
 ```powershell
 npm install
 npm run dev -- --host 127.0.0.1 --port 4173 --strictPort
@@ -81,3 +83,5 @@ npm run build
 ```
 
 The reusable `scripts/browser-qa.mjs` launches an isolated browser session and tests the catalog, themes, cart, checkout, inventory, accounts, reviews and responsive screens without touching the normal browser profile.
+
+Set `VITE_FIREBASE_DISABLED=true` when starting the QA server so the suite uses isolated browser-local preview data instead of the live Firebase project.

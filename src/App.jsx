@@ -26,6 +26,7 @@ import ProductDetail from "./components/ProductDetail";
 import StaffManagement from "./components/StaffManagement";
 import SettingsPage from "./components/SettingsPage";
 import LogoutPage from "./components/LogoutPage";
+import Icon from "./components/Icon";
 
 function CustomerPage({ children }) {
   return <CustomerLayout>{children}</CustomerLayout>;
@@ -50,13 +51,13 @@ function AccessRequired({ allowed, children }) {
       <section className="access-page page-section">
         <div className="container access-required">
           <span className="access-icon">
-            <i className="fa-solid fa-lock" />
+            <Icon name="lock" size={22} />
           </span>
           <p className="eyebrow">Workspace access</p>
           <h1>This area needs a different role.</h1>
           <p>Sign in with an authorized {loginRole} account to continue.</p>
           <a className="btn-brand" href={`#login?role=${loginRole}`}>
-            Sign in <i className="fa-solid fa-arrow-right" />
+            Sign in <Icon name="arrow" size={17} />
           </a>
         </div>
       </section>
@@ -70,7 +71,7 @@ function NotFoundPage() {
       <section className="access-page page-section">
         <div className="container access-required">
           <span className="access-icon">
-            <i className="fa-solid fa-map-location-dot" />
+            <Icon name="location" size={22} />
           </span>
           <p className="eyebrow">Page not found</p>
           <h1>Let’s get you back to Tita Mars.</h1>
@@ -78,7 +79,7 @@ function NotFoundPage() {
             The page you were looking for is not available in this prototype.
           </p>
           <a className="btn-brand" href="#home">
-            Back to home <i className="fa-solid fa-arrow-right" />
+            Back to home <Icon name="arrow" size={17} />
           </a>
         </div>
       </section>

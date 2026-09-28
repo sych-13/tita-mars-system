@@ -275,6 +275,7 @@ export default function StaffManagement() {
               <label key={name}>
                 {label}
                 <input
+                  name={name}
                   type={type}
                   required={
                     name === "name" ||

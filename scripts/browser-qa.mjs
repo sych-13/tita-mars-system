@@ -302,8 +302,9 @@ try {
   clickText("Add Staff");
   fill('dialog input[type="text"]', "QA Staff");
   fill('dialog input[type="email"]', "staff@tita-qa.example");
-  fill('dialog input[type="password"]', "QaOnly-2026!");
-  clickText("Save staff member", "dialog");
+  fill('dialog input[name="password"]', "QaOnly-2026!");
+  fill('dialog input[name="confirm"]', "QaOnly-2026!");
+  clickText("Create staff account", "dialog");
   assert(evaluate('document.body.innerText.includes("staff@tita-qa.example")'));
   shot("staff-management-dark");
   pass("Owner can create a staff account");

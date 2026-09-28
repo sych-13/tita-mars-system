@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useShop } from "../context/ShopContext";
+import Icon from "./Icon";
 
 const peso = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -42,19 +43,21 @@ export default function Cart() {
             <h1>Your cart</h1>
           </div>
           <a className="text-link" href="#catalog">
-            Continue shopping <i className="fa-solid fa-arrow-right" />
+            Continue shopping <Icon name="arrow" size={16} />
           </a>
         </div>
         {items.length === 0 ? (
           <div className="empty-cart">
-            <i className="fa-solid fa-bag-shopping" />
+            <span className="empty-cart-icon">
+              <Icon name="pickup" size={24} />
+            </span>
             <h2>Your cart is waiting.</h2>
             <p>
               Add meals or bakery favorites from the approved menu to begin your
               order.
             </p>
             <a className="btn-brand" href="#catalog">
-              Browse menu <i className="fa-solid fa-arrow-right" />
+              Browse menu <Icon name="arrow" size={16} />
             </a>
           </div>
         ) : (
@@ -77,7 +80,7 @@ export default function Cart() {
                       aria-label={`Decrease ${item.name} quantity`}
                       onClick={() => changeQuantity(item, item.quantity - 1)}
                     >
-                      <i className="fa-solid fa-minus" />
+                      <Icon name="minus" size={16} />
                     </button>
                     <span>{item.quantity}</span>
                     <button
@@ -86,7 +89,7 @@ export default function Cart() {
                       disabled={item.quantity >= item.stock}
                       onClick={() => changeQuantity(item, item.quantity + 1)}
                     >
-                      <i className="fa-solid fa-plus" />
+                      <Icon name="plus" size={16} />
                     </button>
                   </div>
                   <strong className="item-subtotal">
@@ -98,7 +101,7 @@ export default function Cart() {
                     onClick={() => remove(item)}
                     aria-label={`Remove ${item.name}`}
                   >
-                    <i className="fa-solid fa-trash-can" />
+                    <Icon name="trash" size={17} />
                   </button>
                 </article>
               ))}
@@ -118,10 +121,10 @@ export default function Cart() {
                 <strong>{peso.format(total)}</strong>
               </div>
               <a href="#checkout" className="btn-brand checkout-button">
-                Proceed to checkout <i className="fa-solid fa-arrow-right" />
+                Proceed to checkout <Icon name="arrow" size={16} />
               </a>
               <p>
-                <i className="fa-solid fa-circle-info" />
+                <Icon name="warning" size={16} />
                 Pickup is free. Delivery within Taytay &amp; Cainta adds{" "}
                 {peso.format(settings.deliveryFee)} at checkout.
               </p>

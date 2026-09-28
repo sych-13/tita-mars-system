@@ -959,7 +959,7 @@ h2 {
   padding: 3.3rem 1.4rem;
   text-align: center;
 }
-.empty-cart > i {
+.empty-cart-icon {
   display: grid;
   width: 3rem;
   height: 3rem;

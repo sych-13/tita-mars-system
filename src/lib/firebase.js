@@ -19,7 +19,10 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const firebaseConfigured = Object.values(firebaseConfig).every(Boolean);
+const firebaseDisabled = import.meta.env.VITE_FIREBASE_DISABLED === "true";
+
+export const firebaseConfigured =
+  !firebaseDisabled && Object.values(firebaseConfig).every(Boolean);
 
 export const firebaseApp = firebaseConfigured
   ? getApps().length
