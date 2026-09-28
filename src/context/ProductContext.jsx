@@ -26,8 +26,38 @@ const STORAGE_KEY = "tita-mars-products-v2";
 const LOW_STOCK_LIMIT = 5;
 const PRODUCT_CATEGORIES = catalogCategories.slice(1);
 const PRODUCT_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,39}$/;
+const CATEGORY_ORDER = new Map(
+  PRODUCT_CATEGORIES.map((category, index) => [category, index]),
+);
+const SEED_ORDER = new Map(
+  seedProducts.map((product, index) => [product.id, index]),
+);
 
-const cloneSeedProducts = () => seedProducts.map((product) => ({ ...product }));
+const compareProducts = (left, right) => {
+  const categoryDifference =
+    (CATEGORY_ORDER.get(left.category) ?? PRODUCT_CATEGORIES.length) -
+    (CATEGORY_ORDER.get(right.category) ?? PRODUCT_CATEGORIES.length);
+  if (categoryDifference) return categoryDifference;
+
+  const leftSeedOrder = SEED_ORDER.get(left.id);
+  const rightSeedOrder = SEED_ORDER.get(right.id);
+  if (leftSeedOrder !== undefined || rightSeedOrder !== undefined)
+    return (
+      (leftSeedOrder ?? Number.MAX_SAFE_INTEGER) -
+      (rightSeedOrder ?? Number.MAX_SAFE_INTEGER)
+    );
+
+  return (
+    String(left.createdAt || "").localeCompare(String(right.createdAt || "")) ||
+    left.name.localeCompare(right.name) ||
+    left.id.localeCompare(right.id)
+  );
+};
+
+const sortProducts = (products) => [...products].sort(compareProducts);
+
+const cloneSeedProducts = () =>
+  sortProducts(seedProducts.map((product) => ({ ...product })));
 const formatProduct = (product) => {
   const stock = Math.max(0, Number(product.stock) || 0);
   return {
@@ -45,7 +75,7 @@ const formatProduct = (product) => {
 const getInitialProducts = () => {
   const stored = readStorage(STORAGE_KEY, null);
   return Array.isArray(stored) && stored.length
-    ? stored.map(formatProduct)
+    ? sortProducts(stored.map(formatProduct))
     : cloneSeedProducts();
 };
 
@@ -79,9 +109,10 @@ export function ProductProvider({ children }) {
   const commitProducts = useCallback((updater) => {
     const current = productsRef.current;
     const next = typeof updater === "function" ? updater(current) : updater;
-    productsRef.current = next;
-    setProducts(next);
-    return next;
+    const sorted = sortProducts(next);
+    productsRef.current = sorted;
+    setProducts(sorted);
+    return sorted;
   }, []);
 
   useEffect(() => {
@@ -95,7 +126,7 @@ export function ProductProvider({ children }) {
       (snapshot) => {
         const next = snapshot.docs
           .map((item) => formatProduct({ id: item.id, ...item.data() }))
-          .sort((a, b) => a.id.localeCompare(b.id));
+          .sort(compareProducts);
         commitProducts(next);
       },
       () => commitProducts([]),
