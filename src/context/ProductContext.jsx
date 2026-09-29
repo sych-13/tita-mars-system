@@ -18,6 +18,7 @@ import { catalogCategories, seedProducts } from "../data/products";
 import { imageForProduct } from "../data/productImages";
 import { firebaseConfigured, firestore } from "../lib/firebase";
 import { normalizeAssetUrl } from "../utils/assets";
+import { toIsoDate } from "../utils/formatters";
 import { summarizeOrderItems } from "../utils/orderFlow";
 import { readStorage, writeStorage } from "../utils/storage";
 
@@ -69,6 +70,8 @@ const formatProduct = (product) => {
     stock,
     available: stock > 0 && product.available !== false,
     archived: Boolean(product.archived),
+    createdAt: toIsoDate(product.createdAt),
+    updatedAt: toIsoDate(product.updatedAt),
   };
 };
 
