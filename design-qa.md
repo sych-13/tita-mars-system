@@ -1,106 +1,65 @@
-# Design QA — Tita Mars
-Date: 2026-09-15
+# Design QA — Tita Mars Apricot Market Theme
 
-final result: passed
-
-## Findings
-
-No actionable P0/P1/P2 issues remain for the local responsive frontend. This accepts the implemented design and local demonstration flows, not production backend readiness.
+Date: 2026-09-29
 
 ## Source and comparison setup
 
-Source visual truth:
+- Source visual truth: `C:/Users/icaru/.codex/generated_images/01a09612-5d61-7231-936c-eac9ec605efd/exec-dfaa4cb6-7330-4b36-b995-16184427ff6a.png`
+- Source pixels: 1488 × 1058. The source is a single presentation image with light mode in its upper half and dark mode in its lower half.
+- Implementation screenshots:
+  - `C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/qa-apricot-light.png`
+  - `C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/qa-apricot-dark.png`
+- Implementation pixels and CSS viewport: 1440 × 1000 at device pixel ratio 1.
+- Route/state: customer home, light and dark themes, desktop viewport.
+- Responsive evidence: `qa-home-mobile-light.png` and `qa-home-mobile-dark.png` at 390 × 844 CSS pixels; `qa-owner-dark.png` at 1440 × 1000.
+- Density normalization: none required. The source composite was judged by its individual light/dark halves; the implementation modes were captured separately at device pixel ratio 1.
 
-- D:/Downloads/Tita Mars Eatery & Bakery UI Kit.png — 1536 × 1024 pixels.
-- D:/Downloads/Tita Mars Food App UI Showcase.png — 1536 × 1024 pixels.
-- D:/Downloads/Tita Mars E-Commerce System Flow Infographic.png — 1536 × 1024 pixels.
-- D:/Downloads/Tita Mars Bakery Logo.png — supplied brand reference.
+## Full-view comparison evidence
 
-Implementation: http://127.0.0.1:4173/. Project and evidence root: C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/.
+The selected source and both final implementation screenshots were opened in the same visual comparison input. The implementation preserves the source's dominant apricot/espresso split, edge-framed Filipino food photography, orange controls, tinted content surfaces, compact two-column home composition, and dark-mode lighting. The generated background assets retain quiet central space so real UI content stays readable.
 
-The sources are multi-screen design boards, not native browser captures. Comparison excluded device bezels, surrounding infographic labels, palette swatches and technology-stack diagrams. App-owned content regions were compared proportionally at their displayed scale. No claim of pixel-identical source viewport dimensions or numerical pixel-diff score is made.
+## Focused comparison evidence
 
-Browser evidence uses 1440 × 1000 desktop and 390 × 844 mobile CSS pixels, at devicePixelRatio 1. Responsive checks additionally used 768 × 1024. Screenshot pixel dimensions equal CSS viewport dimensions; no density downsampling was necessary. The existing responsive Vite app is retained, not a phone-frame template.
+Separate crops were not required because the original-resolution views made the key fidelity regions readable: header/logo/search/theme controls, hero copy and food crop, product card image/name/price/action stack, category cards, simple-steps row, and page-edge background subjects. Mobile captures were inspected separately for hero crop, bottom navigation, product columns, and text contrast.
 
-State matching: home/catalog were compared in light and dark modes; product order and prices match the approved catalog. Dashboards use actual isolated-test orders, not the design board's invented sales totals. Screenshots with no orders intentionally show empty states. Test cart counts, customer names and dates differ from illustrative source content.
+## Findings
 
-## Full-view and focused comparison evidence
+No actionable P0, P1, or P2 visual differences remain.
 
-The source boards and browser screenshots were opened together in the same visual-comparison inputs, then re-compared after corrections.
-
-- UI Kit with qa-final-home-light.png and qa-owner-dark.png: hero-left/popular-right composition, six-card 3 × 2 desktop arrangement, navbar, category row, dashboard sidebar, metric cards and chart/table arrangement.
-- Food App Showcase with qa-home-mobile-dark.png and qa-final-catalog-light.png: mobile stacked hero/category/cards and persistent bottom navigation; desktop supplier sidebar and four-column menu.
-- System Flow Infographic with qa-checkout-light.png, qa-staff-mobile-dark.png and qa-owner-mobile-dark.png: checkout controls, order summary, staff queue, owner overview and responsive information hierarchy.
-- Additional inspected captures: qa-home-mobile-light.png, qa-final-home-dark.png, qa-cart-desktop.png, qa-confirmation.png, qa-products-dark.png, qa-products-mobile.png, qa-products-mobile-dark.png, qa-login-dark.png, qa-staff-dark.png, qa-staff-reports-dark.png, qa-register-dark.png, qa-settings-mobile.png.
-
-Focused review used the original-resolution combined inputs: header wordmark/control alignment; hero text/photo boundary; supplier/name/price/status/button card stack; checkout label/input/radio alignment; sidebar active state; table image/ID/supplier columns; mobile logo/theme/nav arrangement. These regions were legible at the opened resolution, so separate enlarged raster crops were not required.
+- The implementation intentionally keeps the existing working page proportions rather than copying tiny text from the generated concept literally.
+- The generated source's light and dark halves are a presentation board; the real app exposes each mode as a full viewport through the existing theme toggle.
+- The owner dashboard uses the same background family with more opaque operational panels for table and chart readability.
 
 ## Required fidelity surfaces
 
 | Surface | Result |
 | --- | --- |
-| Fonts/typography | Poppins headings and Inter body/UI are bundled locally. Hero uses bold display weight; compact controls preserve the source density. Heading hierarchy was corrected for catalog cards and mobile login. Hero wrapping no longer collides with food imagery. |
-| Spacing/layout rhythm | Desktop 1320px maximum content width, 22px major grid gaps, thin borders, restrained 8–16px radii. Hero/popular columns become stacked on smaller screens; mobile cards stay two columns. Admin tables scroll inside their panels without widening the page. |
-| Colors/tokens | Orange brand, cream/light surfaces and charcoal dark surfaces match the reference direction. Orange text/button and green stock tokens were darkened where necessary for contrast; dark primary buttons use dark foreground text. Semantic order/stock states are distinct. |
-| Images/assets/icons | Existing real raster food assets and transparent horizontal wordmark are used. Product photos are sharp, consistently cropped and intentionally illustrative. No additional generation after the user's stop request. Phosphor library icons replace custom-drawn art; charts draw real local-order values, not decorative illustrations. |
-| Copy/content | All 22 approved names/prices are unchanged. The two Banana Loaf records remain supplier-separated. Copy describes actual controls and local-preview limitations, without leaking implementation prompts into customer content. |
+| Fonts and typography | Poppins headings and Inter body text preserve the established Tita Mars hierarchy. Weights, wrapping, small labels, and button copy remain readable in both modes. |
+| Spacing and layout rhythm | The desktop home uses an 1160px customer content maximum to expose the photographic page edges. Existing responsive breakpoints remain intact; desktop, tablet, and mobile routes have no horizontal page overflow. |
+| Colors and visual tokens | Light mode uses apricot, peach-sand, caramel, burnt orange, cocoa, and terracotta borders with no pure-white page surfaces. Dark mode uses espresso, smoked brown, copper borders, warm ivory type, and luminous orange actions. |
+| Image quality and asset fidelity | Dedicated 1672 × 942 raster backgrounds were generated for light and dark modes with matched edge composition. Vite fingerprints both assets for reliable GitHub Pages loading. Existing real product and hero images remain sharp and unchanged. |
+| Copy and content | Existing customer, staff, and owner content is preserved. All 22 approved product names and prices remain unchanged. |
 
-## Comparison and repair history
+## Comparison history
 
-1. **P1 — Mobile header order.** Initial mobile capture placed search/theme before a right-aligned logo. Explicit flex ordering restores the logo at left with utility controls at right. Rechecked: qa-home-mobile-light.png and qa-home-mobile-dark.png.
-2. **P2 — Hero text over food.** Early large headline intersected the bowl on mobile and at a desktop boundary. Reduced the responsive headline scale and widened the mobile image crop to keep readable negative space behind copy. Rechecked against the UI Kit and Showcase: qa-final-home-light.png and qa-home-mobile-dark.png.
-3. **P2 — Mobile admin header/table collisions.** Inherited sidebar order put navigation above branding, and product IDs collided with supplier cells. Reordered the sidebar header and gave tables an intentional horizontally scrollable minimum width. Rechecked: qa-products-mobile.png.
-4. **P2 — Grid panels widened mobile dashboards.** Wider data tables and a canvas forced staff/owner panels beyond the viewport. Added min-width:0 to cards/chart containers and max-width:100% to canvas; kept table scrolling inside its region. Empty states now stack vertically. Rechecked: qa-staff-mobile-dark.png and qa-owner-mobile-dark.png; all nine staff/owner routes fit both mobile and tablet widths.
-5. **P2 — Readability and keyboard semantics.** Axe found low-contrast small orange/green copy, an empty table header, missing mobile login H1 and non-focusable scrolling regions. Adjusted tokens, named the action column, added headings and keyboard-focusable table regions; made the workspace topbar a landmark. Post-fix scans of home, catalog, checkout, login, owner/products and settings reported zero automated violations in tested states.
-6. **P2 — Order modal URL/state mismatch.** Closing an updated order left the old selected-order URL, so repeat navigation could fail to reopen it. Modal selection now follows the route and close clears the order parameter. Repeated status transitions pass.
-7. **P2 — Unavailable display ambiguity.** A manually disabled stocked product incorrectly read “Out of stock.” The card now distinguishes manual unavailability from zero inventory. Verified through owner editing and customer catalog.
+1. The first rendered comparison had no actionable visual P0/P1/P2 findings. The background composition, mode colors, content contrast, and responsive structure matched the selected concept closely enough to pass.
+2. A non-visual build warning for fixed public asset paths was removed by moving both backgrounds into the Vite asset pipeline. The post-change production build resolved and fingerprinted both images successfully, with no visible design change.
 
-Historical errors in the long-lived development browser came from hot-reloading rewritten context modules during formatting. A full reload restores that session. Acceptance tests ran in fresh isolated browsers and returned an empty page-error array.
+## Primary interactions and browser checks
 
-## Functional and responsive verification
+- Theme toggle and persisted light/dark selection.
+- Exact 22-product catalog, search/category reset, favorites, and supplier-separated Banana Loaf entries.
+- Cart quantity persistence, delivery and pickup checkout, confirmations, and order history.
+- Owner/staff navigation, order status flow, completed-order inventory deduction, restock, archive/restore, availability, and staff account flow.
+- Customer registration, profile, completed-order review, and all customer routes.
+- Desktop, tablet, and mobile overflow checks.
+- Browser page errors checked: none.
+- Automated result: all 20 browser QA check groups passed.
+- Unit tests: 6 passed.
+- Production build: passed.
 
-The reusable scripts/browser-qa.mjs passed all 19 check groups:
+## Follow-up polish
 
-- Exact 22-product catalog, unique IDs, initial stock 20, local images.
-- Supplier-separated Banana Loaf search and favorites.
-- Theme persistence and mobile header/overflow.
-- Cart quantity persistence on refresh.
-- Delivery checkout with ₱20 fee; persistent thank-you confirmation and history.
-- A separate second pickup order with zero delivery fee.
-- First-owner setup and role navigation.
-- Nine staff/owner routes at 390px and 768px.
-- No inventory deduction for Confirmed, Preparing or Out for Delivery; Completed deducts once and locks, including refresh.
-- Out-of-stock ordering prevention and owner restock.
-- Archive/restore and manual availability.
-- Staff account creation/login and UI role restrictions.
-- Completed-order review and customer registration/profile.
-- Nine customer routes at 1440px, 768px and 390px.
-- No uncaught browser errors in the fresh acceptance session.
+- P3: the two full-resolution background files are intentionally high quality; future WebP/AVIF variants could reduce transfer size for slower mobile connections.
 
-Production build: npm run build passed.
-
-Axe incomplete checks were reviewed separately: text over raster backgrounds needs visual review; offscreen content in intentionally scrolling navigation/tables is not automatically contrast-tested; empty-table header/data association checks need real rows. These are not represented as a blanket accessibility certification.
-
-## Intentional constraints and open questions
-
-- The reference's Beverages tile is replaced by Favorites because the approved catalog contains no beverages. No unapproved product was added.
-- Accurate supplier labels and visible availability add small information not shown on every design-board card.
-- Backend technology logos in the infographic are reference annotations, not evidence of an implemented service. This repository remains a local React/Vite prototype with browser-local persistence.
-- Role previews are intentionally accessible; there is no production server authorization, cross-device sync, multi-tab transactional inventory, automated payments or email reset service.
-- Real customer/order data was not touched. Tests used separate disposable browser sessions and reserved .example test accounts.
-
-## Implementation checklist
-
-- [x] Preserve approved catalog and stock rules.
-- [x] Customer, staff and owner screens implemented with consistent themes.
-- [x] Desktop/mobile visual comparisons and targeted repairs completed.
-- [x] Working primary flows and responsive routes browser-tested.
-- [x] Build succeeds and local server stays running.
-- [x] Local-only limitations documented in README.md.
-
-## Follow-up polish (P3)
-
-- Replace illustrative food photos with the owner's final product photographs when supplied.
-- Optional future image encoding and icon/font bundle pruning for slower connections.
-- Fine-tune minor text density against a native-resolution single-screen mock if one becomes available.
-
+final result: passed

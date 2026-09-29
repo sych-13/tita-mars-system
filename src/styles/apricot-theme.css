@@ -1,0 +1,231 @@
+:root {
+  --primary-orange: #e9520b;
+  --primary-orange-hover: #bb3804;
+  --primary-orange-bright: #ff6b19;
+  --primary-orange-soft: rgb(239 183 127 / 0.82);
+  --background-color: #f6c89e;
+  --surface-color: rgb(250 217 184 / 0.9);
+  --surface-alt: rgb(239 183 127 / 0.88);
+  --surface-strong: rgb(230 163 100 / 0.94);
+  --text-color: #3b1f13;
+  --muted-text-color: #76503a;
+  --border-color: rgb(185 103 54 / 0.52);
+  --button-orange: #c83f05;
+  --on-brand: #fff9f3;
+  --success: #236c38;
+  --warning: #8a5200;
+  --danger: #9e2f28;
+  --shadow-color: 88 40 18;
+  --focus-ring: rgb(187 56 4 / 0.42);
+  --page-background-image: url("../assets/theme-apricot-light.png");
+}
+
+[data-theme="dark"] {
+  --primary-orange: #ff7317;
+  --primary-orange-hover: #ff9145;
+  --primary-orange-bright: #ff7d25;
+  --primary-orange-soft: rgb(91 45 24 / 0.88);
+  --background-color: #1b120e;
+  --surface-color: rgb(33 25 21 / 0.91);
+  --surface-alt: rgb(45 31 25 / 0.91);
+  --surface-strong: rgb(74 48 36 / 0.95);
+  --text-color: #fff3e7;
+  --muted-text-color: #cbb6a6;
+  --border-color: rgb(174 91 48 / 0.54);
+  --button-orange: #ff7317;
+  --on-brand: #281408;
+  --success: #75d18b;
+  --warning: #edb44d;
+  --danger: #ff918b;
+  --shadow-color: 0 0 0;
+  --focus-ring: rgb(255 115 23 / 0.5);
+  --page-background-image: url("../assets/theme-apricot-dark.png");
+}
+
+html {
+  background: var(--background-color);
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--background-color);
+  background-image: var(--page-background-image);
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+#root,
+.customer-shell,
+.workspace-body {
+  min-height: 100vh;
+}
+
+.customer-shell,
+.dashboard-shell,
+.workspace-body,
+.catalog-page,
+.access-page {
+  background: transparent;
+}
+
+.customer-navbar,
+.workspace-topbar,
+.app-sidebar,
+.site-footer {
+  background: var(--surface-color);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.customer-navbar,
+.workspace-topbar {
+  box-shadow: 0 8px 24px rgb(var(--shadow-color) / 0.08);
+}
+
+.site-footer {
+  border-top: 1px solid var(--border-color);
+}
+
+.home-page {
+  margin-top: 16px;
+  margin-bottom: 22px;
+  border: 1px solid rgb(185 103 54 / 0.22);
+  border-radius: 18px;
+  background: rgb(246 200 158 / 0.48);
+  padding: 0 18px 30px;
+  box-shadow: 0 18px 46px rgb(var(--shadow-color) / 0.08);
+  backdrop-filter: blur(6px) saturate(1.04);
+  -webkit-backdrop-filter: blur(6px) saturate(1.04);
+}
+
+[data-theme="dark"] .home-page {
+  border-color: rgb(174 91 48 / 0.25);
+  background: rgb(27 18 14 / 0.5);
+}
+
+.popular-section,
+.home-categories > a,
+.product-card,
+.simple-card,
+.auth-card,
+.catalog-sidebar,
+.catalog-help,
+.cart-list,
+.cart-summary,
+.checkout-form,
+.checkout-summary,
+.order-confirmation,
+.owner-panel,
+.inventory-table-card,
+.inventory-history-card,
+.order-management-card,
+.metric-card,
+.tm-modal,
+dialog {
+  backdrop-filter: blur(14px) saturate(1.06);
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
+}
+
+.home-categories > a,
+.popular-section,
+.simple-card,
+.auth-card,
+.metric-card {
+  box-shadow: 0 10px 28px rgb(var(--shadow-color) / 0.08);
+}
+
+.product-card {
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+}
+
+.nav-search,
+.theme-toggle,
+.role-tabs,
+input,
+select,
+textarea {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dashboard-shell {
+  background: transparent;
+}
+
+.dashboard-content {
+  background: rgb(246 200 158 / 0.34);
+  backdrop-filter: blur(5px) saturate(1.04);
+  -webkit-backdrop-filter: blur(5px) saturate(1.04);
+}
+
+[data-theme="dark"] .dashboard-content {
+  background: rgb(27 18 14 / 0.46);
+}
+
+.app-sidebar {
+  box-shadow: 10px 0 30px rgb(var(--shadow-color) / 0.08);
+}
+
+.hero-copy .btn-brand,
+.btn-brand,
+.add-button,
+.segmented-control button.selected,
+.app-sidebar nav a.active {
+  box-shadow: 0 7px 16px rgb(116 42 9 / 0.2);
+}
+
+[data-theme="dark"] .hero-copy .btn-brand,
+[data-theme="dark"] .btn-brand,
+[data-theme="dark"] .add-button,
+[data-theme="dark"] .segmented-control button.selected,
+[data-theme="dark"] .app-sidebar nav a.active {
+  box-shadow: 0 7px 20px rgb(255 115 23 / 0.14);
+}
+
+@media (min-width: 1201px) {
+  .customer-shell > main .container,
+  .customer-navbar .container,
+  .site-footer .container {
+    max-width: 1160px;
+  }
+}
+
+@media (max-width: 900px) {
+  body {
+    background-attachment: scroll;
+    background-position: center top;
+  }
+
+  .home-page {
+    width: calc(100% - 28px);
+    margin-top: 12px;
+    padding-inline: 12px;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface-color: #fad9b8;
+    --surface-alt: #efb77f;
+    --surface-strong: #e6a364;
+  }
+
+  [data-theme="dark"] {
+    --surface-color: #211915;
+    --surface-alt: #2d1f19;
+    --surface-strong: #4a3024;
+  }
+
+  .customer-navbar,
+  .workspace-topbar,
+  .app-sidebar,
+  .site-footer,
+  .home-page,
+  .dashboard-content {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
