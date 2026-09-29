@@ -17,6 +17,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Keep stylesheet imports in the entry bundle so Bootstrap loads
+          // before the Tita Mars theme exactly as declared in src/main.jsx.
+          if (id.endsWith('.css')) return undefined;
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('/firebase/')) return 'firebase';
           if (id.includes('@phosphor-icons')) return 'icons';
