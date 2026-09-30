@@ -1,9 +1,15 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { catalogCategories, seedProducts } from "../data/products";
 import { useProducts } from "../context/ProductContext";
 import { useShop } from "../context/ShopContext";
 import { peso, prettyDate } from "../utils/formatters";
+import {
+  deleteProductImage,
+  uploadProductImage,
+  validateProductImage,
+} from "../lib/productImageStorage";
+import { storageUploadsEnabled } from "../lib/firebase";
 import Icon from "./Icon";
 import Modal from "./Modal";
 const blank = () => ({
@@ -34,7 +40,15 @@ export default function ProductManagement() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const fileInput = useRef(null);
+  useEffect(
+    () => () => {
+      if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
   const filtered = products.filter(
     (p) =>
       (view === "archived" ? p.archived : !p.archived) &&
@@ -47,6 +61,8 @@ export default function ProductManagement() {
     setDraft(p ? { ...p } : blank());
     setEditing(!!p);
     setError("");
+    setSelectedImage(null);
+    setPreviewUrl("");
   };
   const change = (e) => {
     const { name, value, type, checked } = e.target;
@@ -62,7 +78,7 @@ export default function ProductManagement() {
       setError("Enter a product name and supplier.");
       return;
     }
-    const values = {
+    let values = {
       ...draft,
       name: draft.name.trim(),
       supplier: draft.supplier.trim(),
@@ -70,24 +86,52 @@ export default function ProductManagement() {
       stock: Number(draft.stock),
     };
     setSaving(true);
+    let uploadedImageUrl = "";
+    if (usingFirebase && storageUploadsEnabled && selectedImage) {
+      const uploaded = await uploadProductImage(selectedImage, values.id);
+      if (!uploaded.ok) {
+        setSaving(false);
+        setError(uploaded.error);
+        return;
+      }
+      uploadedImageUrl = uploaded.url;
+      values = { ...values, image: uploaded.url };
+    }
     const result = editing
       ? await updateProduct(draft.id, values)
       : await addProduct(values);
     setSaving(false);
     if (!result.ok) {
+      if (uploadedImageUrl) await deleteProductImage(uploadedImageUrl);
       setError(result.error);
       return;
     }
+    if (
+      usingFirebase &&
+      uploadedImageUrl &&
+      editing &&
+      draft.image &&
+      draft.image !== uploadedImageUrl
+    )
+      await deleteProductImage(draft.image);
     notify(editing ? "Product updated." : "Product added.");
+    setSelectedImage(null);
+    setPreviewUrl("");
     setDraft(null);
   };
   const upload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (usingFirebase) {
-      setError(
-        "Paste a hosted image URL for now. Firebase Storage upload is not configured yet.",
-      );
+    if (usingFirebase && storageUploadsEnabled) {
+      const validationError = validateProductImage(file);
+      if (validationError) {
+        setError(validationError);
+        e.target.value = "";
+        return;
+      }
+      setError("");
+      setSelectedImage(file);
+      setPreviewUrl(URL.createObjectURL(file));
       e.target.value = "";
       return;
     }
@@ -102,8 +146,10 @@ export default function ProductManagement() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () =>
+    reader.onload = () => {
+      setSelectedImage(file);
       setDraft((current) => ({ ...current, image: String(reader.result) }));
+    };
     reader.readAsDataURL(file);
   };
   return (
@@ -267,19 +313,27 @@ export default function ProductManagement() {
         >
           <form onSubmit={save}>
             <div className="product-upload">
-              <img src={draft.image} alt="Product preview" />
+              <img src={previewUrl || draft.image} alt="Product preview" />
               <div>
                 <strong>Product image</strong>
                 <p>Choose a photo for your menu.</p>
-                {!usingFirebase && (
+                {(!usingFirebase || storageUploadsEnabled) && (
                   <button
                     className="btn-secondary"
                     type="button"
                     onClick={() => fileInput.current?.click()}
                   >
                     <Icon name="upload" size={16} />
-                    Upload Image
+                    {selectedImage ? "Replace Image" : "Upload Image"}
                   </button>
+                )}
+                {usingFirebase && !storageUploadsEnabled && (
+                  <small>
+                    Free mode uses the bundled image or a hosted image URL.
+                  </small>
+                )}
+                {selectedImage && (
+                  <small>{selectedImage.name} · Image uploads when saved</small>
                 )}
                 <input
                   ref={fileInput}

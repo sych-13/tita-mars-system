@@ -15,7 +15,13 @@ import {
   runTransaction,
   where,
 } from "firebase/firestore";
-import { firebaseConfigured, firestore } from "../lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import {
+  firebaseConfigured,
+  firebaseFunctions,
+  firestore,
+  trustedBackendEnabled,
+} from "../lib/firebase";
 import {
   orderStatuses,
   statusChangesForOrder,
@@ -162,6 +168,33 @@ export function OrdersProvider({ children }) {
             ok: false,
             error: "Sign in before placing an order so it can be tracked securely.",
           };
+        if (trustedBackendEnabled && firebaseFunctions) {
+          try {
+            const placeOrder = httpsCallable(firebaseFunctions, "createOrder");
+            const response = await placeOrder({
+              customer,
+              phone,
+              email: data.email?.trim().toLowerCase() || "",
+              address: data.orderType === "delivery" ? address : "",
+              deliveryArea:
+                data.orderType === "delivery" ? data.deliveryArea : "",
+              notes: data.notes?.trim() || "",
+              orderType: data.orderType,
+              payment: data.payment,
+              items: data.items.map(({ id, quantity }) => ({ id, quantity })),
+            });
+            const orderData = response.data?.order;
+            if (!orderData?.id)
+              throw new Error("The backend returned an invalid order.");
+            const order = normalizeOrder(orderData);
+            return { ok: true, order };
+          } catch (error) {
+            return {
+              ok: false,
+              error: orderError(error, "Unable to place your order."),
+            };
+          }
+        }
         try {
           const orderRef = doc(collection(firestore, "orders"));
           let order;
@@ -277,6 +310,21 @@ export function OrdersProvider({ children }) {
       if (firebaseConfigured && firestore) {
         if (!user || !["staff", "owner"].includes(role))
           return { ok: false, error: "Only staff or the owner can update an order." };
+        if (trustedBackendEnabled && firebaseFunctions) {
+          try {
+            const changeStatus = httpsCallable(
+              firebaseFunctions,
+              "updateOrderStatus",
+            );
+            await changeStatus({ orderId: id, status });
+            return { ok: true };
+          } catch (error) {
+            return {
+              ok: false,
+              error: orderError(error, "Unable to update this order."),
+            };
+          }
+        }
         try {
           await runTransaction(firestore, async (transaction) => {
             const orderRef = doc(firestore, "orders", id);

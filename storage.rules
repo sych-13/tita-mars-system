@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isActiveOwner() {
+      return signedIn() &&
+        firestore.exists(
+          /databases/(default)/documents/profiles/$(request.auth.uid)
+        ) &&
+        firestore.get(
+          /databases/(default)/documents/profiles/$(request.auth.uid)
+        ).data.role == 'owner' &&
+        firestore.get(
+          /databases/(default)/documents/profiles/$(request.auth.uid)
+        ).data.active == true;
+    }
+
+    match /products/{productId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isActiveOwner() &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType in [
+          'image/jpeg', 'image/png', 'image/webp'
+        ] &&
+        request.resource.metadata.ownerId == request.auth.uid &&
+        request.resource.metadata.productId == productId;
+      allow delete: if isActiveOwner();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

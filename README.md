@@ -2,6 +2,11 @@
 
 Responsive React/Vite storefront and owner/staff workspace based on the supplied Tita Mars design references.
 
+Live deployments:
+
+- Firebase Hosting: https://tita-mars-system-202609.web.app
+- GitHub Pages: https://sych-13.github.io/tita-mars-system/
+
 ## Run locally
 
 Use Node.js 20.19 or newer (Node.js 22.12+ is also supported).
@@ -40,7 +45,37 @@ The app is prepared for Firebase Authentication and Cloud Firestore. When the si
 
 The app retains a local preview fallback when Firebase variables are not available. Preview workspaces intentionally bypass login. Favorites and cart state remain browser-local for now.
 
-In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. Product IDs, stock, supplier/category matching, and store settings are validated before saving. The project does not have a Firebase Storage bucket yet, so product images currently use the bundled temporary images or a hosted image URL.
+In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
+
+The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account.
+
+### Deploy to Firebase Hosting on the free Spark plan
+
+Build and deploy the site at the Firebase domain:
+
+```powershell
+npx.cmd firebase-tools deploy --only hosting
+```
+
+The hosting predeploy step builds Vite with `/` as its base path. The existing GitHub Pages build continues to use `/tita-mars-system/`.
+
+### Optional Blaze-only features
+
+The repository also contains prepared owner-only Firebase Storage uploads for JPG, PNG and WebP product images up to 5 MB, plus callable Cloud Functions for server-authoritative order totals, status transitions and exactly-once inventory deduction. They are not used by the free deployment.
+
+If the project is upgraded later, create the default Storage bucket, install the backend dependencies, and deploy using the optional configuration:
+
+```powershell
+npm.cmd install --prefix functions
+npx.cmd firebase-tools deploy --config firebase.trusted.json --only storage,functions
+```
+
+After both functions are live, deploy the prepared trusted Firestore rules. This disables direct client order creation and staff status writes; only the Admin SDK functions can perform them.
+
+```powershell
+npx.cmd firebase-tools deploy --config firebase.trusted.json --only firestore:rules
+```
+Then set `VITE_FIREBASE_STORAGE_ENABLED=true` and `VITE_TRUSTED_BACKEND_ENABLED=true`. Keep both values `false` for the free-only setup.
 
 ### Configure GitHub Pages
 
@@ -52,6 +87,7 @@ Add these repository secrets in **GitHub -> Settings -> Secrets and variables ->
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
+- `VITE_TRUSTED_BACKEND_ENABLED` (set to `true` only after the callable functions are deployed)
 
 The GitHub Pages workflow uses these values only during the production build. A push to `main` builds and deploys automatically.
 

@@ -8,6 +8,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -33,6 +34,15 @@ export const firebaseApp = firebaseConfigured
 export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 export const firestore = firebaseApp ? getFirestore(firebaseApp) : null;
 export const storage = firebaseApp ? getStorage(firebaseApp) : null;
+export const storageUploadsEnabled =
+  firebaseConfigured &&
+  import.meta.env.VITE_FIREBASE_STORAGE_ENABLED === "true";
+export const trustedBackendEnabled =
+  firebaseConfigured &&
+  import.meta.env.VITE_TRUSTED_BACKEND_ENABLED === "true";
+export const firebaseFunctions = trustedBackendEnabled
+  ? getFunctions(firebaseApp, "asia-southeast1")
+  : null;
 
 const STAFF_CREATOR_APP = "tita-mars-staff-creator";
 

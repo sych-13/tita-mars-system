@@ -101,7 +101,7 @@ const validateProduct = (product) => {
   if (!Number.isSafeInteger(Number(product.stock)) || Number(product.stock) < 0)
     return "Stock quantity must be a non-negative whole number.";
   if (firebaseConfigured && product.image?.startsWith("data:"))
-    return "Paste a hosted image URL for now. Firebase Storage upload is not configured yet.";
+    return "Use the bundled image or paste a hosted image URL in the free Firebase setup.";
   return "";
 };
 
