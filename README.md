@@ -115,8 +115,14 @@ After the first owner signs in, staff accounts can be created from **Owner Dashb
 Run the production build before deployment:
 
 ```powershell
+npm test
+npm run test:rules
 npm run build
 ```
+
+`npm run test:rules` starts the local Firestore emulator and verifies public,
+customer, staff and owner permissions without reading or changing live data.
+GitHub Actions runs both automated test suites before every Pages deployment.
 
 The reusable `scripts/browser-qa.mjs` launches an isolated browser session and tests the catalog, themes, cart, checkout, inventory, accounts, reviews and responsive screens without touching the normal browser profile.
 
