@@ -168,10 +168,27 @@ try {
     evaluate('document.querySelector(".checkout-total strong").textContent'),
     "₱160",
   );
+  click('[name="payment"][value="gcash"]');
+  assert(evaluate('document.querySelector(".gcash-payment-panel") !== null'));
+  assert(
+    evaluate(
+      'document.querySelector(".gcash-payment-total").textContent.includes("160")',
+    ),
+  );
+  assert(
+    evaluate(
+      'document.querySelector(".gcash-qr-crop img").complete && document.querySelector(".gcash-qr-crop img").naturalWidth > 0',
+    ),
+  );
   shot("checkout-light");
   click(".checkout-summary button");
   pause();
   assert(evaluate('document.querySelector(".order-confirmation") !== null'));
+  assert(
+    evaluate(
+      'document.querySelector(".order-confirmation .gcash-payment-panel") !== null',
+    ),
+  );
   assert.equal(orders()[0].status, "Pending");
   assert.equal(orders()[0].deliveryFee, 20);
   assert.equal(products().find((p) => p.id === "TME-001").stock, 20);
@@ -189,7 +206,7 @@ try {
     ),
   );
   pass(
-    "Delivery checkout, ₱20 fee, confirmation refresh and order history; no Pending stock deduction",
+    "Delivery checkout, GCash QR, ₱20 fee, confirmation refresh and order history; no Pending stock deduction",
   );
 
   go("home");

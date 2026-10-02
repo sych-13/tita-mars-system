@@ -26,7 +26,7 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 ## Implemented
 
 - Customer storefront, supplier-filtered catalog, search, favorites, product details and persistent cart.
-- Pickup or Taytay/Cainta delivery, Cash or GCash selection, checkout, confirmation, order tracking and completed-order reviews.
+- Pickup or Taytay/Cainta delivery, Cash or manual GCash QR payment, checkout, confirmation, order tracking and completed-order reviews.
 - Owner workspace: dashboard, product editor, archive/restore, inventory, reports, CSV export, staff management and settings.
 - Staff workspace: order queue, status updates, inventory monitoring and daily sales report.
 - Firebase email/password login, customer registration, password-reset emails, and protected role-based workspaces.

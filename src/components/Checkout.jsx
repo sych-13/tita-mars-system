@@ -5,8 +5,58 @@ import { useSession } from "../context/SessionContext";
 import { useShop } from "../context/ShopContext";
 import { useHashRoute } from "../hooks/useHashRoute";
 import { peso } from "../utils/formatters";
+import gcashQrImage from "../assets/gcash-payment-qr.jpg";
 import OrderStatusBadge from "./OrderStatusBadge";
 import Icon from "./Icon";
+
+function GcashPaymentPanel({ amount, settings, confirmation = false }) {
+  const accountDetails = [settings.gcashName, settings.gcashNumber]
+    .filter(Boolean)
+    .join(" · ");
+  const titleId = confirmation
+    ? "confirmation-gcash-title"
+    : "checkout-gcash-title";
+
+  return (
+    <section
+      className={`gcash-payment-panel ${confirmation ? "gcash-payment-confirmation" : ""}`}
+      aria-labelledby={titleId}
+    >
+      <div className="gcash-payment-copy">
+        <span className="gcash-payment-label">Manual GCash payment</span>
+        <h3 id={titleId}>Scan the QR to pay</h3>
+        <p className="gcash-payment-total">
+          Send exactly <strong>{peso.format(amount)}</strong>
+        </p>
+        {accountDetails && (
+          <p className="gcash-account-details">{accountDetails}</p>
+        )}
+        <ol>
+          <li>Scan or save the QR code.</li>
+          <li>Enter the exact order total shown above.</li>
+          <li>Keep your GCash reference or payment screenshot.</li>
+        </ol>
+        <p className="gcash-manual-note">
+          Tita Mars will check the payment manually before confirming the order.
+        </p>
+      </div>
+      <figure className="gcash-qr-figure">
+        <div className="gcash-qr-crop">
+          <img src={gcashQrImage} alt="GCash payment QR code for Tita Mars" />
+        </div>
+        <a
+          className="gcash-download-link"
+          href={gcashQrImage}
+          download="tita-mars-gcash-qr.jpg"
+        >
+          <Icon name="download" size={17} />
+          Download full QR
+        </a>
+      </figure>
+    </section>
+  );
+}
+
 export default function Checkout() {
   const { items, total, clearCart } = useCart();
   const { orders, createOrder } = useOrders();
@@ -119,11 +169,11 @@ export default function Checkout() {
               <strong>{peso.format(order.total)}</strong>
             </div>
             {order.payment === "gcash" && (
-              <p>
-                {settings.gcashNumber
-                  ? `GCash: ${settings.gcashName} · ${settings.gcashNumber}. Your payment will be checked by the store.`
-                  : "The store will provide GCash payment details when confirming your order."}
-              </p>
+              <GcashPaymentPanel
+                amount={order.total}
+                settings={settings}
+                confirmation
+              />
             )}
             <div className="confirmation-actions">
               <a className="btn-brand" href={`#my-orders?order=${order.id}`}>
@@ -293,6 +343,7 @@ export default function Checkout() {
                       <input
                         type="radio"
                         name="payment"
+                        value={value}
                         checked={payment === value}
                         onChange={() => setPayment(value)}
                       />
@@ -305,13 +356,7 @@ export default function Checkout() {
                   ))}
                 </div>
                 {payment === "gcash" && (
-                  <div className="gcash-info">
-                    <strong>{settings.gcashName || "Pay with GCash"}</strong>
-                    <p>
-                      {settings.gcashNumber ||
-                        "Payment details will be provided by the store when your order is confirmed."}
-                    </p>
-                  </div>
+                  <GcashPaymentPanel amount={grandTotal} settings={settings} />
                 )}
               </fieldset>
               <fieldset>
