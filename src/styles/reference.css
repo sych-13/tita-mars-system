@@ -1505,6 +1505,29 @@ textarea {
   color: #dc2626;
   background: #fff0f0;
 }
+.payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.payment-status-badge.cash {
+  color: var(--muted-text-color);
+  background: var(--surface-alt);
+}
+.payment-status-badge.pending {
+  color: #a55600;
+  background: #fff1d6;
+}
+.payment-status-badge.verified {
+  color: #117a35;
+  background: #e1f7e8;
+}
 [data-theme="dark"] .status-badge {
   background: var(--surface-strong);
 }
@@ -1528,6 +1551,18 @@ textarea {
 }
 [data-theme="dark"] .status-badge.cancelled {
   color: #ff9090;
+}
+[data-theme="dark"] .payment-status-badge.cash {
+  color: #b1bbc9;
+  background: var(--surface-strong);
+}
+[data-theme="dark"] .payment-status-badge.pending {
+  color: #ffc16c;
+  background: rgb(165 86 0 / 0.18);
+}
+[data-theme="dark"] .payment-status-badge.verified {
+  color: #7be49c;
+  background: rgb(17 122 53 / 0.2);
 }
 .stock-status {
   font-size: 9px;
@@ -3067,6 +3102,42 @@ textarea {
   font-size: 11px;
   margin: 4px 0;
 }
+.payment-verification-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 17px 0;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--primary-orange-soft);
+}
+.payment-verification-card > div {
+  display: grid;
+  gap: 7px;
+}
+.payment-verification-card p,
+.payment-verification-card small {
+  margin: 0;
+  font-size: 10px;
+}
+.payment-verification-label {
+  color: var(--text-color);
+  font-size: 11px;
+  font-weight: 700;
+}
+.payment-verification-card button {
+  flex: none;
+}
+.tracking-payment-status {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tracking-payment-status small {
+  color: var(--muted-text-color);
+}
 .completion-note {
   display: flex;
   gap: 8px;
@@ -3079,6 +3150,10 @@ textarea {
   flex-wrap: wrap;
 }
 @media (max-width: 680px) {
+  .payment-verification-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .product-table-filters {
     flex-wrap: wrap;
     gap: 9px;

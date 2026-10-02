@@ -7,6 +7,7 @@ import { useHashRoute } from "../hooks/useHashRoute";
 import { peso } from "../utils/formatters";
 import gcashQrImage from "../assets/gcash-payment-qr.jpg";
 import OrderStatusBadge from "./OrderStatusBadge";
+import PaymentStatusBadge from "./PaymentStatusBadge";
 import Icon from "./Icon";
 
 function GcashPaymentPanel({ amount, settings, confirmation = false }) {
@@ -157,6 +158,9 @@ export default function Checkout() {
               We’ll keep you updated every step of the way.
             </p>
             <OrderStatusBadge status={order.status} />
+            {order.payment === "gcash" && (
+              <PaymentStatusBadge status={order.paymentStatus} />
+            )}
             <div className="confirmation-details">
               <span>
                 <Icon

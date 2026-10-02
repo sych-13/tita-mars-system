@@ -1,9 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  paymentStatusForOrder,
   statusChangesForOrder,
   summarizeOrderItems,
 } from "../src/utils/orderFlow.js";
+
+test("payment status normalizes cash and legacy GCash orders safely", () => {
+  assert.equal(paymentStatusForOrder({ payment: "cash" }), "Not Required");
+  assert.equal(
+    paymentStatusForOrder({ payment: "gcash" }),
+    "Pending Verification",
+  );
+  assert.equal(
+    paymentStatusForOrder({ payment: "gcash", paymentStatus: "Verified" }),
+    "Verified",
+  );
+});
 
 test("pickup orders follow the required status sequence", () => {
   assert.deepEqual(

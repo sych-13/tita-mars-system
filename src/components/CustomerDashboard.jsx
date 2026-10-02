@@ -8,6 +8,7 @@ import { isActiveOrder, peso, prettyDate } from "../utils/formatters";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import OrderStatusBadge from "./OrderStatusBadge";
+import PaymentStatusBadge from "./PaymentStatusBadge";
 export default function CustomerDashboard() {
   const { orders, saveReview } = useOrders();
   const { products } = useProducts();
@@ -90,6 +91,9 @@ export default function CustomerDashboard() {
                   {o.items.reduce((sum, i) => sum + i.quantity, 0)} items
                 </span>
               </div>
+              {o.payment === "gcash" && (
+                <PaymentStatusBadge status={o.paymentStatus} />
+              )}
               <div className="order-card-bottom">
                 <strong>{peso.format(o.total)}</strong>
                 <div>
@@ -146,6 +150,17 @@ export default function CustomerDashboard() {
                 />
               </header>
               <strong>{active.number}</strong>
+              {active.payment === "gcash" && (
+                <div className="tracking-payment-status">
+                  <PaymentStatusBadge status={active.paymentStatus} />
+                  {active.paymentStatus !== "Verified" && (
+                    <small>
+                      Tita Mars will confirm this after checking the GCash
+                      transaction.
+                    </small>
+                  )}
+                </div>
+              )}
               {active.status === "Cancelled" ? (
                 <p>This order has been cancelled by the store.</p>
               ) : (

@@ -1,7 +1,8 @@
 rules_version = '2';
 
-// Deploy this ruleset only after createOrder and updateOrderStatus are live and
-// VITE_TRUSTED_BACKEND_ENABLED=true is deployed to the web application.
+// Deploy this ruleset only after createOrder, updateOrderStatus and
+// updatePaymentStatus are live and VITE_TRUSTED_BACKEND_ENABLED=true is
+// deployed to the web application.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {

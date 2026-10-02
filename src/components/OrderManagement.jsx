@@ -9,11 +9,12 @@ import { useProducts } from "../context/ProductContext";
 import { useShop } from "../context/ShopContext";
 import { useHashRoute } from "../hooks/useHashRoute";
 import OrderStatusBadge from "./OrderStatusBadge";
+import PaymentStatusBadge from "./PaymentStatusBadge";
 import Modal from "./Modal";
 import Icon from "./Icon";
 import { peso, prettyDate } from "../utils/formatters";
 export default function OrderManagement({ role = "owner" }) {
-  const { orders, updateOrderStatus } = useOrders();
+  const { orders, updateOrderStatus, updatePaymentStatus } = useOrders();
   const { products } = useProducts();
   const { notify } = useShop();
   const { params, navigate } = useHashRoute();
@@ -21,6 +22,7 @@ export default function OrderManagement({ role = "owner" }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [paymentUpdating, setPaymentUpdating] = useState(false);
   const visible = orders.filter(
     (o) =>
       (filter === "All" || o.status === filter) &&
@@ -44,6 +46,20 @@ export default function OrderManagement({ role = "owner" }) {
     setUpdating(false);
     notify(result.ok ? `${current.number} updated to ${next}.` : result.error);
     if (result.ok) close();
+  };
+  const updatePayment = async () => {
+    const next =
+      current.paymentStatus === "Verified"
+        ? "Pending Verification"
+        : "Verified";
+    setPaymentUpdating(true);
+    const result = await updatePaymentStatus(current.id, next);
+    setPaymentUpdating(false);
+    notify(
+      result.ok
+        ? `${current.number} payment marked ${next.toLowerCase()}.`
+        : result.error,
+    );
   };
   return (
     <DashboardLayout role={role === "staff" ? "Staff" : "Owner / Admin"}>
@@ -104,6 +120,7 @@ export default function OrderManagement({ role = "owner" }) {
                 <th>Customer</th>
                 <th>Type</th>
                 <th>Total</th>
+                <th>Payment</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -117,6 +134,9 @@ export default function OrderManagement({ role = "owner" }) {
                   <td>{o.customer}</td>
                   <td>{o.orderType === "pickup" ? "Pickup" : "Delivery"}</td>
                   <td>{peso.format(o.total)}</td>
+                  <td>
+                    <PaymentStatusBadge status={o.paymentStatus} />
+                  </td>
                   <td>
                     <OrderStatusBadge status={o.status} />
                   </td>
@@ -182,6 +202,46 @@ export default function OrderManagement({ role = "owner" }) {
             </p>
             {current.notes && <p>Notes: {current.notes}</p>}
           </div>
+          {current.payment === "gcash" && (
+            <section className="payment-verification-card">
+              <div>
+                <span className="payment-verification-label">
+                  Manual GCash verification
+                </span>
+                <PaymentStatusBadge status={current.paymentStatus} />
+                <p>
+                  Match the order total with the GCash transaction before
+                  marking this payment as verified.
+                </p>
+                {current.paymentVerifiedAt && (
+                  <small>
+                    Verified {prettyDate(current.paymentVerifiedAt)}
+                  </small>
+                )}
+              </div>
+              <button
+                type="button"
+                className={
+                  current.paymentStatus === "Verified"
+                    ? "btn-secondary"
+                    : "btn-brand"
+                }
+                onClick={updatePayment}
+                disabled={paymentUpdating}
+                aria-label={
+                  current.paymentStatus === "Verified"
+                    ? "Return GCash payment to pending verification"
+                    : "Mark GCash payment as verified"
+                }
+              >
+                {paymentUpdating
+                  ? "Saving…"
+                  : current.paymentStatus === "Verified"
+                    ? "Mark as pending"
+                    : "Verify payment"}
+              </button>
+            </section>
+          )}
           <label>
             Status
             <select

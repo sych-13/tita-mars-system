@@ -51,35 +51,42 @@ const product = (id = "TME-001", overrides = {}) => ({
   ...overrides,
 });
 
-const order = (id, customerId, overrides = {}) => ({
-  id,
-  customerId,
-  customer: "Test Customer",
-  phone: "09123456789",
-  email: "customer@example.com",
-  address: "",
-  deliveryArea: "",
-  notes: "",
-  orderType: "pickup",
-  payment: "cash",
-  subtotal: 70,
-  deliveryFee: 0,
-  total: 70,
-  items: [
-    {
-      id: "TME-001",
-      name: "Adobo",
-      price: 70,
-      quantity: 1,
-    },
-  ],
-  number: `TM-${id.toUpperCase()}`,
-  status: "Pending",
-  createdAt: iso(),
-  updatedAt: iso(),
-  inventoryDeductedAt: null,
-  ...overrides,
-});
+const order = (id, customerId, overrides = {}) => {
+  const payment = overrides.payment || "cash";
+  return {
+    id,
+    customerId,
+    customer: "Test Customer",
+    phone: "09123456789",
+    email: "customer@example.com",
+    address: "",
+    deliveryArea: "",
+    notes: "",
+    orderType: "pickup",
+    payment,
+    paymentStatus:
+      payment === "gcash" ? "Pending Verification" : "Not Required",
+    paymentVerifiedAt: null,
+    paymentVerifiedBy: null,
+    subtotal: 70,
+    deliveryFee: 0,
+    total: 70,
+    items: [
+      {
+        id: "TME-001",
+        name: "Adobo",
+        price: 70,
+        quantity: 1,
+      },
+    ],
+    number: `TM-${id.toUpperCase()}`,
+    status: "Pending",
+    createdAt: iso(),
+    updatedAt: iso(),
+    inventoryDeductedAt: null,
+    ...overrides,
+  };
+};
 
 const storeSettings = {
   name: "Tita Mars Eatery and Bakery",
@@ -197,6 +204,58 @@ test("staff can follow order status transitions but cannot skip or edit totals",
     }),
   );
   await assertFails(updateDoc(orderRef, { status: "Confirmed", updatedAt: iso(5) }));
+});
+
+test("staff can verify only GCash payments and customers cannot self-verify", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "orders/gcash-order"),
+      order("gcash-order", "customer-a", { payment: "gcash" }),
+    );
+  });
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  const customerDb = testEnv.authenticatedContext("customer-a").firestore();
+  const gcashRef = doc(staffDb, "orders/gcash-order");
+  await assertFails(
+    updateDoc(doc(customerDb, "orders/gcash-order"), {
+      paymentStatus: "Verified",
+      paymentVerifiedAt: iso(1),
+      paymentVerifiedBy: "customer-a",
+      updatedAt: iso(1),
+    }),
+  );
+  await assertFails(
+    updateDoc(doc(staffDb, "orders/order-a"), {
+      paymentStatus: "Verified",
+      paymentVerifiedAt: iso(1),
+      paymentVerifiedBy: "staff-1",
+      updatedAt: iso(1),
+    }),
+  );
+  await assertFails(
+    updateDoc(gcashRef, {
+      paymentStatus: "Verified",
+      paymentVerifiedAt: iso(1),
+      paymentVerifiedBy: "owner-1",
+      updatedAt: iso(1),
+    }),
+  );
+  await assertSucceeds(
+    updateDoc(gcashRef, {
+      paymentStatus: "Verified",
+      paymentVerifiedAt: iso(1),
+      paymentVerifiedBy: "staff-1",
+      updatedAt: iso(1),
+    }),
+  );
+  await assertSucceeds(
+    updateDoc(gcashRef, {
+      paymentStatus: "Pending Verification",
+      paymentVerifiedAt: null,
+      paymentVerifiedBy: null,
+      updatedAt: iso(2),
+    }),
+  );
 });
 
 test("staff may deduct stock but cannot restock or edit product details", async () => {

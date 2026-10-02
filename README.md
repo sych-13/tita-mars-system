@@ -26,7 +26,7 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 ## Implemented
 
 - Customer storefront, supplier-filtered catalog, search, favorites, product details and persistent cart.
-- Pickup or Taytay/Cainta delivery, Cash or manual GCash QR payment, checkout, confirmation, order tracking and completed-order reviews.
+- Pickup or Taytay/Cainta delivery, Cash or manual GCash QR payment, staff/owner payment verification, checkout, confirmation, order tracking and completed-order reviews.
 - Owner workspace: dashboard, product editor, archive/restore, inventory, reports, CSV export, staff management and settings.
 - Staff workspace: order queue, status updates, inventory monitoring and daily sales report.
 - Firebase email/password login, customer registration, password-reset emails, and protected role-based workspaces.
@@ -47,7 +47,7 @@ The app retains a local preview fallback when Firebase variables are not availab
 
 In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
 
-The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account.
+The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Manual GCash verification is protected by Firestore roles and updates the customer view in real time. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account.
 
 ### Deploy to Firebase Hosting on the free Spark plan
 

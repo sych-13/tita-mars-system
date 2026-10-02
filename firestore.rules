@@ -71,12 +71,27 @@ service cloud.firestore {
             resource.data.inventoryDeductedAt);
     }
 
+    function validPaymentUpdate() {
+      return resource.data.payment == 'gcash' &&
+        request.resource.data.payment == 'gcash' &&
+        request.resource.data.paymentStatus in [
+          'Pending Verification', 'Verified'
+        ] &&
+        ((request.resource.data.paymentStatus == 'Verified' &&
+            request.resource.data.paymentVerifiedAt is string &&
+            request.resource.data.paymentVerifiedBy == request.auth.uid) ||
+          (request.resource.data.paymentStatus == 'Pending Verification' &&
+            request.resource.data.paymentVerifiedAt == null &&
+            request.resource.data.paymentVerifiedBy == null));
+    }
+
     function validNewOrder(orderId) {
       return request.resource.data.keys().hasOnly([
           'id', 'customerId', 'customer', 'phone', 'email', 'address',
           'deliveryArea', 'notes', 'orderType', 'payment', 'subtotal',
           'deliveryFee', 'total', 'items', 'number', 'status', 'createdAt',
-          'updatedAt', 'inventoryDeductedAt'
+          'updatedAt', 'inventoryDeductedAt', 'paymentStatus',
+          'paymentVerifiedAt', 'paymentVerifiedBy'
         ]) &&
         request.resource.data.id == orderId &&
         request.resource.data.customerId == request.auth.uid &&
@@ -90,6 +105,12 @@ service cloud.firestore {
         request.resource.data.notes is string &&
         request.resource.data.orderType in ['pickup', 'delivery'] &&
         request.resource.data.payment in ['cash', 'gcash'] &&
+        ((request.resource.data.payment == 'cash' &&
+            request.resource.data.paymentStatus == 'Not Required') ||
+          (request.resource.data.payment == 'gcash' &&
+            request.resource.data.paymentStatus == 'Pending Verification')) &&
+        request.resource.data.paymentVerifiedAt == null &&
+        request.resource.data.paymentVerifiedBy == null &&
         request.resource.data.subtotal is number &&
         request.resource.data.deliveryFee is number &&
         request.resource.data.total is number &&
@@ -227,12 +248,19 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.customerId == request.auth.uid || isStaff());
       allow update: if
         (isStaff() &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'updatedAt', 'inventoryDeductedAt']) &&
-          request.resource.data.updatedAt is string &&
-          validStatusForOrder() &&
-          validStatusTransition() &&
-          validInventoryMarker()) ||
+          ((request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'updatedAt', 'inventoryDeductedAt']) &&
+            request.resource.data.updatedAt is string &&
+            validStatusForOrder() &&
+            validStatusTransition() &&
+            validInventoryMarker()) ||
+           (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly([
+                'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy',
+                'updatedAt'
+              ]) &&
+            request.resource.data.updatedAt is string &&
+            validPaymentUpdate()))) ||
         (isOwnOrder() &&
           resource.data.status == 'Completed' &&
           !resource.data.keys().hasAny(['review']) &&

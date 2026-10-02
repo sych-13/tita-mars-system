@@ -8,6 +8,19 @@ export const orderStatuses = [
   "Cancelled",
 ];
 
+export const paymentStatuses = [
+  "Not Required",
+  "Pending Verification",
+  "Verified",
+];
+
+export const paymentStatusForOrder = (order) => {
+  if (order?.payment !== "gcash") return "Not Required";
+  return order?.paymentStatus === "Verified"
+    ? "Verified"
+    : "Pending Verification";
+};
+
 export const statusesForOrder = (order) =>
   order?.orderType === "delivery"
     ? [

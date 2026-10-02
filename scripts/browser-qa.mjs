@@ -190,6 +190,7 @@ try {
     ),
   );
   assert.equal(orders()[0].status, "Pending");
+  assert.equal(orders()[0].paymentStatus, "Pending Verification");
   assert.equal(orders()[0].deliveryFee, 20);
   assert.equal(products().find((p) => p.id === "TME-001").stock, 20);
   const firstOrder = orders()[0];
@@ -242,6 +243,23 @@ try {
   }
   call("set", "viewport", "1440", "1000");
   pass("All 9 owner/staff screens stay inside tablet and mobile viewports");
+
+  go("manage-orders?order=" + firstOrder.id);
+  assert(
+    evaluate(
+      'document.body.innerText.includes("Pending verification")',
+    ),
+  );
+  click('[aria-label="Mark GCash payment as verified"]');
+  pause();
+  assert.equal(
+    orders().find((o) => o.id === firstOrder.id).paymentStatus,
+    "Verified",
+  );
+  assert(
+    evaluate('document.body.innerText.includes("Payment verified")'),
+  );
+  pass("Owner can verify a manual GCash payment");
 
   go("manage-orders?order=" + firstOrder.id);
   for (const status of ["Confirmed", "Preparing", "Out for Delivery"]) {
@@ -359,6 +377,7 @@ try {
   go("logout");
   clickText("Logout");
   go("my-orders");
+  assert(evaluate('document.body.innerText.includes("Payment verified")'));
   clickText("Rate & Review");
   click('[aria-label="Rate 4 stars"]');
   fill("dialog textarea", "Great test meal.");

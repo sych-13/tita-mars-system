@@ -182,6 +182,10 @@ exports.createOrder = onCall(callableOptions, async (request) => {
         notes,
         orderType,
         payment,
+        paymentStatus:
+          payment === "gcash" ? "Pending Verification" : "Not Required",
+        paymentVerifiedAt: null,
+        paymentVerifiedBy: null,
         subtotal,
         deliveryFee,
         total: subtotal + deliveryFee,
@@ -263,6 +267,48 @@ exports.updateOrderStatus = onCall(callableOptions, async (request) => {
     if (error instanceof HttpsError) throw error;
     logger.error("updateOrderStatus failed", { orderId, error });
     throw businessError("Unable to update this order.", "internal");
+  }
+
+  return { ok: true };
+});
+
+exports.updatePaymentStatus = onCall(callableOptions, async (request) => {
+  if (!request.auth)
+    throw businessError("Sign in before updating a payment.", "unauthenticated");
+  await requireActiveProfile(request.auth.uid, ["staff", "owner"]);
+
+  const orderId = cleanText(request.data?.orderId, 128);
+  const paymentStatus = cleanText(request.data?.paymentStatus, 40);
+  if (
+    !orderId ||
+    orderId.includes("/") ||
+    !["Pending Verification", "Verified"].includes(paymentStatus)
+  )
+    throw businessError("That payment status is not valid.", "invalid-argument");
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const orderRef = db.doc(`orders/${orderId}`);
+      const orderSnapshot = await transaction.get(orderRef);
+      if (!orderSnapshot.exists)
+        throw businessError("Order not found.", "not-found");
+      if (orderSnapshot.data().payment !== "gcash")
+        throw businessError(
+          "Only GCash orders need manual payment verification.",
+        );
+      const timestamp = new Date().toISOString();
+      transaction.update(orderRef, {
+        paymentStatus,
+        paymentVerifiedAt: paymentStatus === "Verified" ? timestamp : null,
+        paymentVerifiedBy:
+          paymentStatus === "Verified" ? request.auth.uid : null,
+        updatedAt: timestamp,
+      });
+    });
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("updatePaymentStatus failed", { orderId, error });
+    throw businessError("Unable to update this payment.", "internal");
   }
 
   return { ok: true };

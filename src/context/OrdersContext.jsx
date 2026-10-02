@@ -24,6 +24,7 @@ import {
 } from "../lib/firebase";
 import {
   orderStatuses,
+  paymentStatusForOrder,
   statusChangesForOrder,
   statusesForOrder,
   summarizeOrderItems,
@@ -67,6 +68,12 @@ const normalizeOrder = (order) => ({
       .slice(-6)
       .toUpperCase()}`,
   status: orderStatuses.includes(order.status) ? order.status : "Pending",
+  paymentStatus: paymentStatusForOrder(order),
+  paymentVerifiedAt: toIsoDate(order.paymentVerifiedAt),
+  paymentVerifiedBy:
+    typeof order.paymentVerifiedBy === "string"
+      ? order.paymentVerifiedBy
+      : null,
   createdAt: toIsoDate(order.createdAt),
   updatedAt: toIsoDate(order.updatedAt),
   inventoryDeductedAt: toIsoDate(order.inventoryDeductedAt),
@@ -263,6 +270,12 @@ export function OrdersProvider({ children }) {
               notes: data.notes?.trim().slice(0, 600) || "",
               orderType: data.orderType,
               payment: data.payment,
+              paymentStatus:
+                data.payment === "gcash"
+                  ? "Pending Verification"
+                  : "Not Required",
+              paymentVerifiedAt: null,
+              paymentVerifiedBy: null,
               subtotal,
               deliveryFee,
               total: subtotal + deliveryFee,
@@ -293,6 +306,10 @@ export function OrdersProvider({ children }) {
           .slice(-6)
           .toUpperCase()}`,
         status: "Pending",
+        paymentStatus:
+          data.payment === "gcash" ? "Pending Verification" : "Not Required",
+        paymentVerifiedAt: null,
+        paymentVerifiedBy: null,
         createdAt: timestamp,
         updatedAt: timestamp,
         inventoryDeductedAt: null,
@@ -432,6 +449,87 @@ export function OrdersProvider({ children }) {
     [commitOrders, deductInventory, role, user],
   );
 
+  const updatePaymentStatus = useCallback(
+    async (id, paymentStatus) => {
+      if (!["Pending Verification", "Verified"].includes(paymentStatus))
+        return { ok: false, error: "That payment status is not valid." };
+      const target = ordersRef.current.find((order) => order.id === id);
+      if (!target) return { ok: false, error: "Order not found." };
+      if (target.payment !== "gcash")
+        return {
+          ok: false,
+          error: "Only GCash orders need manual payment verification.",
+        };
+      if (firebaseConfigured && firestore) {
+        if (!user || !["staff", "owner"].includes(role))
+          return {
+            ok: false,
+            error: "Only staff or the owner can verify a GCash payment.",
+          };
+        if (trustedBackendEnabled && firebaseFunctions) {
+          try {
+            const changePaymentStatus = httpsCallable(
+              firebaseFunctions,
+              "updatePaymentStatus",
+            );
+            await changePaymentStatus({ orderId: id, paymentStatus });
+            return { ok: true };
+          } catch (error) {
+            return {
+              ok: false,
+              error: orderError(error, "Unable to update this payment."),
+            };
+          }
+        }
+        try {
+          await runTransaction(firestore, async (transaction) => {
+            const orderRef = doc(firestore, "orders", id);
+            const snapshot = await transaction.get(orderRef);
+            if (!snapshot.exists()) throw new Error("Order not found.");
+            if (snapshot.data().payment !== "gcash")
+              throw new Error(
+                "Only GCash orders need manual payment verification.",
+              );
+            const timestamp = new Date().toISOString();
+            transaction.update(orderRef, {
+              paymentStatus,
+              paymentVerifiedAt:
+                paymentStatus === "Verified" ? timestamp : null,
+              paymentVerifiedBy:
+                paymentStatus === "Verified" ? user.id : null,
+              updatedAt: timestamp,
+            });
+          });
+          return { ok: true };
+        } catch (error) {
+          return {
+            ok: false,
+            error: orderError(error, "Unable to update this payment."),
+          };
+        }
+      }
+
+      const timestamp = new Date().toISOString();
+      commitOrders((current) =>
+        current.map((order) =>
+          order.id === id
+            ? {
+                ...order,
+                paymentStatus,
+                paymentVerifiedAt:
+                  paymentStatus === "Verified" ? timestamp : null,
+                paymentVerifiedBy:
+                  paymentStatus === "Verified" ? user?.id || role : null,
+                updatedAt: timestamp,
+              }
+            : order,
+        ),
+      );
+      return { ok: true };
+    },
+    [commitOrders, role, user],
+  );
+
   const saveReview = useCallback(
     async (id, review) => {
       const target = ordersRef.current.find((order) => order.id === id);
@@ -478,8 +576,20 @@ export function OrdersProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ orders, createOrder, updateOrderStatus, saveReview }),
-    [createOrder, orders, updateOrderStatus, saveReview],
+    () => ({
+      orders,
+      createOrder,
+      updateOrderStatus,
+      updatePaymentStatus,
+      saveReview,
+    }),
+    [
+      createOrder,
+      orders,
+      updateOrderStatus,
+      updatePaymentStatus,
+      saveReview,
+    ],
   );
   return (
     <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>
