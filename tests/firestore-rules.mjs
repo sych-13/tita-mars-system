@@ -258,12 +258,20 @@ test("staff can verify only GCash payments and customers cannot self-verify", as
   );
 });
 
-test("staff may deduct stock but cannot restock or edit product details", async () => {
+test("staff may adjust stock but cannot edit product details or availability independently", async () => {
   const db = testEnv.authenticatedContext("staff-1").firestore();
   const productRef = doc(db, "products/TME-001");
-  await assertSucceeds(updateDoc(productRef, { stock: 19, updatedAt: iso(1) }));
-  await assertFails(updateDoc(productRef, { stock: 21, updatedAt: iso(2) }));
-  await assertFails(updateDoc(productRef, { price: 1, updatedAt: iso(2) }));
+  await assertSucceeds(updateDoc(productRef, { stock: 25, updatedAt: iso(1) }));
+  await assertSucceeds(
+    updateDoc(productRef, { stock: 0, available: false, updatedAt: iso(2) }),
+  );
+  await assertSucceeds(
+    updateDoc(productRef, { stock: 10, available: true, updatedAt: iso(3) }),
+  );
+  await assertFails(
+    updateDoc(productRef, { available: false, updatedAt: iso(4) }),
+  );
+  await assertFails(updateDoc(productRef, { price: 1, updatedAt: iso(4) }));
 });
 
 test("only owners can manage products, store settings, and staff profiles", async () => {

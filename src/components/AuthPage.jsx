@@ -52,14 +52,15 @@ export default function AuthPage({ mode = "login" }) {
         result = signup
           ? await register(form)
           : await login(form.email, form.password, accountRole);
-      if (result.ok)
-        navigate(
+      if (result.ok) {
+        const defaultDestination =
           result.account.role === "owner"
             ? "owner"
             : result.account.role === "staff"
               ? "staff"
-              : params.next || "home",
-        );
+              : "home";
+        navigate(params.next || defaultDestination);
+      }
       else setError(result.error);
     } catch {
       setError("Unable to save this account. Please try again.");
@@ -103,7 +104,10 @@ export default function AuthPage({ mode = "login" }) {
               ["owner", "Owner"],
             ].map(([role, label]) => (
               <a
-                href={`#login?role=${role}`}
+                href={`#login?${new URLSearchParams({
+                  role,
+                  ...(params.next ? { next: params.next } : {}),
+                })}`}
                 key={role}
                 className={accountRole === role ? "selected" : ""}
               >

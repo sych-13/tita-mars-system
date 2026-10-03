@@ -27,9 +27,11 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 
 - Customer storefront, supplier-filtered catalog, search, favorites, product details and persistent cart.
 - Pickup or Taytay/Cainta delivery, Cash or manual GCash QR payment, staff/owner payment verification, checkout, confirmation, order tracking and completed-order reviews.
-- Owner workspace: dashboard, product editor, archive/restore, inventory, reports, CSV export, staff management and settings.
-- Staff workspace: order queue, status updates, inventory monitoring and daily sales report.
+- A unique pickup-verification QR is shown when a pickup order reaches **Ready for Pickup**. Scanning it opens that order in the protected staff/owner workspace.
+- Owner workspace: dashboard, product editor, archive/restore, inventory, preset or custom-date sales reports, filtered CSV export, staff management and settings.
+- Staff workspace: order queue, status updates, finished-product restocking, inventory monitoring and daily sales report.
 - Firebase email/password login, customer registration, password-reset emails, and protected role-based workspaces.
+- Store location preview and one-click Google Maps directions based on the address in Settings.
 - Role-aware return-to-workspace navigation from the storefront and safe modals that do not dismiss on outside clicks.
 - Light/dark themes, responsive layouts and temporary food images.
 
@@ -48,6 +50,8 @@ The app retains a local preview fallback when Firebase variables are not availab
 In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
 
 The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Manual GCash verification is protected by Firestore roles and updates the customer view in real time. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account.
+
+Order-confirmation and order-status emails are not active yet. Password-reset email is the only current transactional email. A mail provider and a trusted server/Cloud Function are required so provider credentials are never exposed in the browser. The project also does not currently run a separate Laravel/REST backend; Firebase Authentication and Cloud Firestore are its active application APIs.
 
 ### Deploy to Firebase Hosting on the free Spark plan
 
@@ -121,9 +125,10 @@ npm run build
 ```
 
 `npm run test:rules` starts the local Firestore emulator and verifies public,
-customer, staff and owner permissions without reading or changing live data.
+customer, staff and owner permissions, including staff restocking restrictions,
+without reading or changing live data.
 GitHub Actions runs both automated test suites before every Pages deployment.
 
-The reusable `scripts/browser-qa.mjs` launches an isolated browser session and tests the catalog, themes, cart, checkout, inventory, accounts, reviews and responsive screens without touching the normal browser profile.
+The reusable `scripts/browser-qa.mjs` launches an isolated browser session and tests the catalog, themes, cart, checkout, GCash verification, pickup QR, custom reports, inventory, accounts, reviews and responsive screens without touching the normal browser profile.
 
 Set `VITE_FIREBASE_DISABLED=true` when starting the QA server so the suite uses isolated browser-local preview data instead of the live Firebase project.

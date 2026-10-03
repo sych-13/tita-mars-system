@@ -168,6 +168,13 @@ export default function OrderManagement({ role = "owner" }) {
             <OrderStatusBadge status={current.status} />
           </div>
           <p className="order-modal-date">{prettyDate(current.createdAt)}</p>
+          {params.source === "pickup" && current.orderType === "pickup" && (
+            <p className="pickup-scan-note" role="status">
+              <Icon name="completed" size={18} weight="fill" />
+              Pickup QR matched {current.number}. Confirm the customer and
+              items before marking the order Completed.
+            </p>
+          )}
           {current.items.map((i) => (
             <div className="checkout-summary-item" key={i.id}>
               <img

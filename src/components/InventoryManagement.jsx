@@ -81,7 +81,7 @@ export default function InventoryManagement({ role = "owner" }) {
           <h1>Inventory</h1>
           <p>
             {role === "staff"
-              ? "Monitor availability and let the owner know when stock is running low."
+              ? "Monitor availability and record newly received finished-product stock."
               : "Manage finished meals and bakery products. No ingredient tracking."}
           </p>
         </div>
@@ -171,7 +171,7 @@ export default function InventoryManagement({ role = "owner" }) {
                 <th>Stock</th>
                 <th>Status</th>
                 <th>Updated</th>
-                {role === "owner" && <th>Action</th>}
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -196,26 +196,24 @@ export default function InventoryManagement({ role = "owner" }) {
                     </span>
                   </td>
                   <td>{prettyDate(product.updatedAt)}</td>
-                  {role === "owner" && (
-                    <td>
-                      <button
-                        className="btn-secondary table-view"
-                        onClick={() => {
-                          setSelected(product.id);
-                          setQuantity(5);
-                        }}
-                        aria-label={
-                          "Restock " +
-                          product.name +
-                          " from " +
-                          product.supplier
-                        }
-                      >
-                        <Icon name="plus" size={14} />
-                        Restock
-                      </button>
-                    </td>
-                  )}
+                  <td>
+                    <button
+                      className="btn-secondary table-view"
+                      onClick={() => {
+                        setSelected(product.id);
+                        setQuantity(5);
+                      }}
+                      aria-label={
+                        "Restock " +
+                        product.name +
+                        " from " +
+                        product.supplier
+                      }
+                    >
+                      <Icon name="plus" size={14} />
+                      Restock
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -274,7 +272,7 @@ export default function InventoryManagement({ role = "owner" }) {
           </div>
         )}
       </section>
-      {current && role === "owner" && (
+      {current && (
         <Modal title="Restock Product" onClose={() => setSelected(null)}>
           <form onSubmit={restock}>
             <div className="table-product">

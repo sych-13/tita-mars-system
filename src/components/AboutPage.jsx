@@ -3,6 +3,8 @@ import { assetUrl } from "../utils/assets";
 import Icon from "./Icon";
 export default function AboutPage() {
   const { settings } = useShop();
+  const mapQuery = encodeURIComponent(settings.address);
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapQuery}`;
   return (
     <section className="container page-section about-page">
       <div className="about-grid">
@@ -59,6 +61,22 @@ export default function AboutPage() {
           <p>
             <Icon name="location" size={17} /> {settings.address}
           </p>
+          <div className="store-map">
+            <iframe
+              title="Tita Mars location on Google Maps"
+              src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+          <a
+            className="btn-secondary map-directions-link"
+            href={directionsUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Icon name="location" size={17} /> Get directions
+          </a>
           <p>
             <Icon name="pending" size={17} /> {settings.hours}
           </p>

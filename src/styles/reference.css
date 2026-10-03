@@ -1369,6 +1369,39 @@ textarea {
   border-radius: 5px;
   padding: 5px 8px;
 }
+.report-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.report-controls select {
+  min-width: 135px;
+}
+.report-controls .btn-secondary {
+  min-height: 37px;
+}
+.report-controls .btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.custom-date-filter {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.custom-date-filter label {
+  flex: 1 1 180px;
+  margin: 0;
+}
+.custom-date-filter .period-label {
+  margin-bottom: 8px;
+}
+.report-orders-table {
+  margin-bottom: 22px;
+}
 .chart-caption {
   font-size: 9px;
   margin: 4px 0 0;
@@ -2328,6 +2361,25 @@ textarea {
   }
 }
 @media (max-width: 680px) {
+  .report-controls {
+    justify-content: stretch;
+    width: 100%;
+  }
+  .report-controls select,
+  .report-controls .btn-secondary {
+    flex: 1;
+  }
+  .custom-date-filter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .custom-date-filter label {
+    flex-basis: auto;
+  }
+  .custom-date-filter .period-label {
+    margin: 0;
+    text-align: center;
+  }
   body {
     font-size: 13px;
   }
@@ -3138,6 +3190,77 @@ textarea {
 .tracking-payment-status small {
   color: var(--muted-text-color);
 }
+.pickup-qr-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 148px;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--primary-orange);
+  border-radius: 12px;
+  background: var(--primary-orange-soft);
+}
+.pickup-qr-card h3 {
+  margin: 5px 0 7px;
+  font-size: 15px;
+}
+.pickup-qr-card p {
+  margin: 0 0 10px;
+  font-size: 10px;
+}
+.pickup-qr-image {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  overflow: hidden;
+  border: 6px solid #fff;
+  border-radius: 10px;
+  background: #fff;
+  color: #3a2418;
+  font-size: 9px;
+  text-align: center;
+}
+.pickup-qr-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.pickup-scan-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 11px 12px;
+  border: 1px solid rgb(34 197 94 / 0.35);
+  border-radius: 8px;
+  background: rgb(34 197 94 / 0.1);
+  color: var(--success);
+  font-size: 10px;
+}
+.pickup-scan-note svg {
+  flex: none;
+}
+.store-map {
+  position: relative;
+  min-height: 210px;
+  margin: 15px 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-alt);
+}
+.store-map iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.map-directions-link {
+  width: 100%;
+  margin-bottom: 10px;
+}
 .completion-note {
   display: flex;
   gap: 8px;
@@ -3150,6 +3273,13 @@ textarea {
   flex-wrap: wrap;
 }
 @media (max-width: 680px) {
+  .pickup-qr-card {
+    grid-template-columns: 1fr;
+  }
+  .pickup-qr-image {
+    width: min(100%, 220px);
+    justify-self: center;
+  }
   .payment-verification-card {
     align-items: stretch;
     flex-direction: column;

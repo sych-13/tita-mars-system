@@ -34,6 +34,7 @@ function CustomerPage({ children }) {
 
 function AccessRequired({ allowed, children }) {
   const { ready, role, user, usingFirebase } = useSession();
+  const { route, params } = useHashRoute();
   if (!ready)
     return (
       <CustomerPage>
@@ -45,7 +46,10 @@ function AccessRequired({ allowed, children }) {
       </CustomerPage>
     );
   if (allowed.includes(role) && (!usingFirebase || user)) return children;
-  const loginRole = allowed.includes("owner") ? "owner" : "staff";
+  const loginRole = allowed.length === 1 ? allowed[0] : "staff";
+  const nextQuery = new URLSearchParams(params).toString();
+  const next = `${route}${nextQuery ? `?${nextQuery}` : ""}`;
+  const loginQuery = new URLSearchParams({ role: loginRole, next }).toString();
   return (
     <CustomerPage>
       <section className="access-page page-section">
@@ -56,7 +60,7 @@ function AccessRequired({ allowed, children }) {
           <p className="eyebrow">Workspace access</p>
           <h1>This area needs a different role.</h1>
           <p>Sign in with an authorized {loginRole} account to continue.</p>
-          <a className="btn-brand" href={`#login?role=${loginRole}`}>
+          <a className="btn-brand" href={`#login?${loginQuery}`}>
             Sign in <Icon name="arrow" size={17} />
           </a>
         </div>

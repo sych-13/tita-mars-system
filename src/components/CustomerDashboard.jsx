@@ -9,6 +9,7 @@ import Icon from "./Icon";
 import Modal from "./Modal";
 import OrderStatusBadge from "./OrderStatusBadge";
 import PaymentStatusBadge from "./PaymentStatusBadge";
+import PickupVerificationQr from "./PickupVerificationQr";
 export default function CustomerDashboard() {
   const { orders, saveReview } = useOrders();
   const { products } = useProducts();
@@ -186,6 +187,10 @@ export default function CustomerDashboard() {
                   ))}
                 </ol>
               )}
+              {active.orderType === "pickup" &&
+                active.status === "Ready for Pickup" && (
+                  <PickupVerificationQr order={active} />
+                )}
               <div className="tracking-details">
                 {active.items.map((item) => (
                   <div className="summary-row" key={item.id}>

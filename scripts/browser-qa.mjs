@@ -145,6 +145,16 @@ try {
   pass("Mobile layout has no page overflow and logo stays left");
   call("set", "viewport", "1440", "1000");
 
+  go("about");
+  assert(evaluate('document.querySelector(".store-map iframe") !== null'));
+  assert(
+    evaluate(
+      'document.querySelector(".map-directions-link").href.startsWith("https://www.google.com/maps/dir/")',
+    ),
+  );
+  shot("about-map-light");
+  pass("Google Maps location and directions are available to customers");
+
   go("catalog");
   shot("catalog-light");
   click(".product-card:first-child .add-button");
@@ -220,6 +230,7 @@ try {
   assert.equal(orders().length, 2);
   assert(evaluate('document.querySelector(".order-confirmation") !== null'));
   assert.equal(orders()[0].deliveryFee, 0);
+  const secondOrder = orders()[0];
   pass(
     "Second order keeps its thank-you screen and is saved separately; pickup is free",
   );
@@ -281,6 +292,56 @@ try {
   pass(
     "Confirmed/Preparing/Out for Delivery leave stock unchanged; Completed deducts exactly once and locks",
   );
+
+  go("manage-orders?order=" + secondOrder.id);
+  for (const status of ["Confirmed", "Preparing", "Ready for Pickup"]) {
+    select("dialog select", status);
+    click("dialog>.full-button");
+    pause();
+    assert.equal(products().find((p) => p.id === "TME-001").stock, 18);
+    go("manage-orders?order=" + secondOrder.id);
+  }
+  go("my-orders?order=" + secondOrder.id);
+  pause();
+  assert(
+    evaluate(
+      'document.querySelector(".pickup-qr-image img")?.src.startsWith("data:image/png")',
+    ),
+  );
+  assert(
+    evaluate(
+      'document.querySelector(".pickup-qr-card").textContent.includes(' +
+        JSON.stringify(secondOrder.number) +
+        ")",
+    ),
+  );
+  shot("pickup-customer-qr-light");
+  go("manage-orders?order=" + secondOrder.id + "&source=pickup");
+  assert(evaluate('document.querySelector(".pickup-scan-note") !== null'));
+  shot("pickup-scan-match-light");
+  pass("Ready-for-pickup orders provide a working staff verification QR flow");
+
+  go("reports");
+  select('[aria-label="Report period"]', "custom");
+  const reportDate = evaluate(
+    '(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()',
+  );
+  fill(".custom-date-filter label:first-child input", reportDate);
+  fill(".custom-date-filter label:nth-child(2) input", reportDate);
+  assert(
+    evaluate(
+      'document.querySelector(".report-orders-table").textContent.includes(' +
+        JSON.stringify(firstOrder.number) +
+        ")",
+    ),
+  );
+  assert(
+    evaluate(
+      '!document.querySelector(".report-controls .btn-secondary").disabled',
+    ),
+  );
+  shot("custom-report-light");
+  pass("Custom-date reports show completed orders and enable CSV export");
 
   go("owner");
   shot("owner-light");
@@ -357,13 +418,29 @@ try {
   go("logout");
   clickText("Logout");
   pause();
-  go("login?role=staff");
+  go("manage-orders?order=" + secondOrder.id + "&source=pickup");
+  assert(
+    evaluate(
+      'document.querySelector(".access-required .btn-brand").href.includes("next=")',
+    ),
+  );
+  clickText("Sign in");
   fill('[name="email"]', "staff@tita-qa.example");
   fill('[name="password"]', "QaOnly-2026!");
   clickText("Login");
   pause();
-  assert.equal(evaluate("location.hash"), "#staff");
+  assert(
+    evaluate('location.hash.startsWith("#manage-orders?order=")'),
+  );
+  assert(evaluate('document.querySelector(".pickup-scan-note") !== null'));
+  go("staff");
   shot("staff-dark");
+  go("inventory");
+  click('[aria-label="Restock Adobo from Tita Mars Eatery"]');
+  fill('dialog input[type="number"]', "2");
+  clickText("Add Stock", "dialog");
+  assert.equal(products().find((p) => p.id === "TME-001").stock, 22);
+  shot("staff-inventory-dark");
   go("products");
   assert(
     evaluate(
@@ -372,7 +449,9 @@ try {
   );
   go("staff-reports");
   shot("staff-reports-dark");
-  pass("Staff login, staff dashboard/report and UI role restriction");
+  pass(
+    "Staff pickup-QR return, inventory restock, dashboard/report and UI role restriction",
+  );
 
   go("logout");
   clickText("Logout");

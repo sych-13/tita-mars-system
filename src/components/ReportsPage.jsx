@@ -2,27 +2,56 @@ import { useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useOrders } from "../context/OrdersContext";
 import { useProducts } from "../context/ProductContext";
-import { peso } from "../utils/formatters";
+import { peso, prettyDate } from "../utils/formatters";
 import SalesChart from "./SalesChart";
 import Icon from "./Icon";
 export default function ReportsPage({ role = "owner" }) {
   const { orders } = useOrders();
   const { products } = useProducts();
   const [period, setPeriod] = useState("all");
+  const today = new Date();
+  const localDate = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const [from, setFrom] = useState(() =>
+    localDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+  );
+  const [to, setTo] = useState(() => localDate(today));
   const dateFor = (o) =>
     new Date(o.inventoryDeductedAt || o.updatedAt || o.createdAt);
-  const complete = orders.filter(
-    (o) =>
-      o.status === "Completed" &&
-      (period === "all" ||
-        (period === "today" &&
-          dateFor(o).toDateString() === new Date().toDateString()) ||
-        (period === "week" &&
-          Date.now() - dateFor(o).getTime() < 7 * 86400000) ||
-        (period === "month" &&
-          dateFor(o).getMonth() === new Date().getMonth() &&
-          dateFor(o).getFullYear() === new Date().getFullYear())),
-  );
+  const customStart = from ? new Date(`${from}T00:00:00`) : null;
+  const customEnd = to ? new Date(`${to}T23:59:59.999`) : null;
+  const complete = orders
+    .filter((o) => {
+      if (o.status !== "Completed") return false;
+      const date = dateFor(o);
+      if (Number.isNaN(date.getTime())) return false;
+      if (period === "all") return true;
+      if (period === "today")
+        return date.toDateString() === new Date().toDateString();
+      if (period === "week")
+        return Date.now() - date.getTime() < 7 * 86400000;
+      if (period === "month")
+        return (
+          date.getMonth() === new Date().getMonth() &&
+          date.getFullYear() === new Date().getFullYear()
+        );
+      return (
+        period === "custom" &&
+        customStart &&
+        customEnd &&
+        customStart <= customEnd &&
+        date >= customStart &&
+        date <= customEnd
+      );
+    })
+    .sort((a, b) => dateFor(b) - dateFor(a));
+  const periodLabels = {
+    all: "All time",
+    today: "Today",
+    week: "Last 7 days",
+    month: "This month",
+    custom: from && to ? `${from} to ${to}` : "Custom dates",
+  };
   const revenue = complete.reduce((sum, o) => sum + Number(o.total), 0);
   const customers = new Set(
     complete.map((o) => o.customerId || o.phone || o.customer),
@@ -40,6 +69,45 @@ export default function ReportsPage({ role = "owner" }) {
   const best = Object.values(sold)
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 5);
+  const exportReport = () => {
+    const safeCell = (value) => {
+      let text = String(value ?? "");
+      if (/^[=+\-@]/.test(text)) text = `'${text}`;
+      return `"${text.replaceAll('"', '""')}"`;
+    };
+    const rows = [
+      [
+        "Completed",
+        "Order Number",
+        "Customer",
+        "Fulfillment",
+        "Payment",
+        "Subtotal",
+        "Delivery Fee",
+        "Total",
+      ],
+      ...complete.map((order) => [
+        dateFor(order).toISOString(),
+        order.number,
+        order.customer,
+        order.orderType === "pickup" ? "Pickup" : "Delivery",
+        order.payment === "gcash" ? "GCash" : "Cash",
+        Number(order.subtotal || 0),
+        Number(order.deliveryFee || 0),
+        Number(order.total || 0),
+      ]),
+    ];
+    const blob = new Blob(
+      ["\uFEFF" + rows.map((row) => row.map(safeCell).join(",")).join("\n")],
+      { type: "text/csv;charset=utf-8" },
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tita-mars-sales-${period}-${localDate(new Date())}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   return (
     <DashboardLayout role={role === "staff" ? "Staff" : "Owner / Admin"}>
       <header className="workspace-header">
@@ -48,17 +116,54 @@ export default function ReportsPage({ role = "owner" }) {
           <h1>{role === "staff" ? "Daily Sales" : "Sales Report"}</h1>
           <p>A closer look at your sales and customer favorites.</p>
         </div>
-        <select
-          aria-label="Report period"
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-        >
-          <option value="all">All time</option>
-          <option value="today">Today</option>
-          <option value="week">Last 7 days</option>
-          <option value="month">This month</option>
-        </select>
+        <div className="report-controls">
+          <select
+            aria-label="Report period"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+          >
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 days</option>
+            <option value="month">This month</option>
+            <option value="custom">Custom dates</option>
+          </select>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={exportReport}
+            disabled={!complete.length}
+          >
+            <Icon name="download" size={17} /> Export CSV
+          </button>
+        </div>
       </header>
+      {period === "custom" && (
+        <section className="simple-card custom-date-filter">
+          <label>
+            Start date
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+          </label>
+          <label>
+            End date
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              max={localDate(new Date())}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </label>
+          <span className="period-label">
+            {complete.length} completed order{complete.length === 1 ? "" : "s"}
+          </span>
+        </section>
+      )}
       <div className="metric-grid">
         {[
           ["Total Sales", peso.format(revenue), "cash"],
@@ -82,7 +187,7 @@ export default function ReportsPage({ role = "owner" }) {
         <section className="simple-card">
           <header className="table-toolbar">
             <h2>Sales Overview</h2>
-            <span className="period-label">Last 7 days</span>
+            <span className="period-label">Recent 7-day trend</span>
           </header>
           <SalesChart orders={complete} line={role !== "staff"} />
         </section>
@@ -115,6 +220,54 @@ export default function ReportsPage({ role = "owner" }) {
           )}
         </section>
       </div>
+      <section className="simple-card report-orders-table">
+        <header className="table-toolbar">
+          <h2>Completed Orders</h2>
+          <span className="period-label">{periodLabels[period]}</span>
+        </header>
+        {complete.length ? (
+          <div
+            className="table-scroll"
+            tabIndex="0"
+            role="region"
+            aria-label="Completed orders in this report"
+          >
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Completed</th>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Type</th>
+                  <th>Payment</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {complete.map((order) => (
+                  <tr key={order.id}>
+                    <td>{prettyDate(dateFor(order))}</td>
+                    <td>{order.number}</td>
+                    <td>{order.customer}</td>
+                    <td>
+                      {order.orderType === "pickup" ? "Pickup" : "Delivery"}
+                    </td>
+                    <td>{order.payment === "gcash" ? "GCash" : "Cash"}</td>
+                    <td>
+                      <strong>{peso.format(order.total)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="dashboard-empty">
+            <Icon name="chart" size={34} />
+            <p>No completed orders in this date range.</p>
+          </div>
+        )}
+      </section>
       <section className="simple-card">
         <h2>Sales by Supplier</h2>
         <div
