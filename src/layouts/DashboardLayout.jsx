@@ -1,5 +1,6 @@
 import Sidebar from "../components/Sidebar";
 import Icon from "../components/Icon";
+import NotificationCenter from "../components/NotificationCenter";
 export default function DashboardLayout({ children, role = "Owner / Admin" }) {
   return (
     <div className="dashboard-shell">
@@ -20,14 +21,17 @@ export default function DashboardLayout({ children, role = "Owner / Admin" }) {
             <Icon name="store" size={18} />
             Tita Mars <small>/ {role === "Staff" ? "Staff" : "Overview"}</small>
           </span>
-          <span>
-            <Icon name="calendar" size={17} />
-            {new Date().toLocaleDateString("en-PH", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </span>
+          <div className="workspace-topbar-actions">
+            <NotificationCenter />
+            <span>
+              <Icon name="calendar" size={17} />
+              {new Date().toLocaleDateString("en-PH", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+          </div>
         </header>
         <main id="main-content" className="dashboard-content" tabIndex="-1">
           {children}

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { firebaseConfigured, firestore } from "../lib/firebase";
 import { readStorage, writeStorage } from "../utils/storage";
+import { useActivity } from "./ActivityContext";
 const ShopContext = createContext();
 const defaults = {
   name: "Tita Mars Eatery & Bakery",
@@ -12,8 +13,14 @@ const defaults = {
   deliveryFee: 20,
   gcashName: "",
   gcashNumber: "",
+  orderingEnabled: true,
+  openingTime: "06:00",
+  closingTime: "21:00",
+  allowScheduledOrders: true,
+  maxScheduleDays: 7,
 };
 export function ShopProvider({ children }) {
+  const { logActivity } = useActivity();
   const [settings, setSettings] = useState(() => ({
     ...defaults,
     ...readStorage("tita-mars-settings", {}),
@@ -42,11 +49,34 @@ export function ShopProvider({ children }) {
       settings,
       saveSettings: async (next) => {
         const deliveryFee = Number(next.deliveryFee ?? settings.deliveryFee);
+        const maxScheduleDays = Number(
+          next.maxScheduleDays ?? settings.maxScheduleDays,
+        );
         if (!Number.isInteger(deliveryFee) || deliveryFee < 0)
           return {
             ok: false,
             error: "Delivery fee must be a non-negative whole number.",
           };
+        if (
+          !Number.isInteger(maxScheduleDays) ||
+          maxScheduleDays < 1 ||
+          maxScheduleDays > 30
+        )
+          return {
+            ok: false,
+            error: "Schedule window must be from 1 to 30 days.",
+          };
+        const openingTime = String(
+          next.openingTime ?? settings.openingTime,
+        );
+        const closingTime = String(
+          next.closingTime ?? settings.closingTime,
+        );
+        if (
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(openingTime) ||
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(closingTime)
+        )
+          return { ok: false, error: "Choose valid opening and closing times." };
         const values = {
           name: String(next.name ?? settings.name).trim().slice(0, 120),
           phone: String(next.phone ?? settings.phone).trim().slice(0, 30),
@@ -60,6 +90,15 @@ export function ShopProvider({ children }) {
           gcashNumber: String(next.gcashNumber ?? settings.gcashNumber)
             .trim()
             .slice(0, 30),
+          orderingEnabled:
+            next.orderingEnabled ?? settings.orderingEnabled ?? true,
+          openingTime,
+          closingTime,
+          allowScheduledOrders:
+            next.allowScheduledOrders ??
+            settings.allowScheduledOrders ??
+            true,
+          maxScheduleDays,
         };
         if (!values.name || !values.address || !values.hours)
           return {
@@ -70,6 +109,12 @@ export function ShopProvider({ children }) {
           try {
             await setDoc(doc(firestore, "settings", "store"), values, {
               merge: true,
+            });
+            await logActivity({
+              action: "update_settings",
+              entityType: "settings",
+              entityId: "store",
+              summary: "Updated store, fulfillment, or payment settings.",
             });
             return { ok: true };
           } catch (error) {
@@ -84,6 +129,12 @@ export function ShopProvider({ children }) {
           }
         }
         setSettings(values);
+        await logActivity({
+          action: "update_settings",
+          entityType: "settings",
+          entityId: "store",
+          summary: "Updated store, fulfillment, or payment settings.",
+        });
         return { ok: true };
       },
       favorites,
@@ -95,7 +146,7 @@ export function ShopProvider({ children }) {
         ),
       notify: setNotice,
     }),
-    [settings, favorites],
+    [favorites, logActivity, settings],
   );
   return (
     <ShopContext.Provider value={value}>

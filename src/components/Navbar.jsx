@@ -5,6 +5,7 @@ import Icon from "./Icon";
 import { useCart } from "../context/CartContext";
 import { useSession } from "../context/SessionContext";
 import { useHashRoute } from "../hooks/useHashRoute";
+import NotificationCenter from "./NotificationCenter";
 const links = [
   ["Home", "home"],
   ["Menu", "catalog"],
@@ -68,6 +69,7 @@ export default function Navbar() {
           </button>
         </form>
         <div className="nav-actions">
+          <NotificationCenter compact />
           <a
             className="icon-button mobile-search"
             href="#catalog"

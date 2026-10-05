@@ -169,6 +169,11 @@ try {
   shot("cart-desktop");
   pass("Cart quantity update survives refresh");
   go("checkout");
+  assert(
+    evaluate(
+      "document.querySelector('[name=\"fulfillment-timing\"]:checked') !== null",
+    ),
+  );
   fill('[name="name"]', "QA Customer");
   fill('[name="phone"]', "09123456789");
   click('[name="order-type"][value="delivery"]');
@@ -185,6 +190,17 @@ try {
       'document.querySelector(".gcash-payment-total").textContent.includes("160")',
     ),
   );
+  fill('[name="gcashReference"]', "1234567890123");
+  fill('[name="gcashSenderName"]', "QA Customer");
+  evaluate(
+    '(() => { const d = new Date(); const p = n => String(n).padStart(2,"0"); const value = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; const input = document.querySelector("[name=gcashPaidAt]"); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; setter.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true })); return input.value; })()',
+  );
+  const paymentValues = evaluate(
+    '(["gcashReference","gcashSenderName","gcashPaidAt"].map(name => document.querySelector(`[name="${name}"]`).value))',
+  );
+  assert.equal(paymentValues[0], "1234567890123");
+  assert.equal(paymentValues[1], "QA Customer");
+  assert(paymentValues[2], JSON.stringify(paymentValues));
   assert(
     evaluate(
       'document.querySelector(".gcash-qr-crop img").complete && document.querySelector(".gcash-qr-crop img").naturalWidth > 0',
@@ -193,7 +209,12 @@ try {
   shot("checkout-light");
   click(".checkout-summary button");
   pause();
-  assert(evaluate('document.querySelector(".order-confirmation") !== null'));
+  assert(
+    evaluate('document.querySelector(".order-confirmation") !== null'),
+    evaluate(
+      'document.querySelector(".form-error, .checkout-error")?.textContent?.trim() || "Order confirmation did not render"',
+    ),
+  );
   assert(
     evaluate(
       'document.querySelector(".order-confirmation .gcash-payment-panel") !== null',
@@ -202,11 +223,24 @@ try {
   assert.equal(orders()[0].status, "Pending");
   assert.equal(orders()[0].paymentStatus, "Pending Verification");
   assert.equal(orders()[0].deliveryFee, 20);
+  assert.equal(orders()[0].gcashReference, "1234567890123");
+  assert.equal(orders()[0].gcashSenderName, "QA Customer");
+  assert(orders()[0].statusHistory.length === 1);
   assert.equal(products().find((p) => p.id === "TME-001").stock, 20);
   const firstOrder = orders()[0];
   call("reload");
   pause();
   assert(evaluate('document.querySelector(".order-confirmation") !== null'));
+  clickText("View receipt");
+  assert(evaluate('document.querySelector("dialog .order-receipt") !== null'));
+  assert(
+    evaluate(
+      'document.querySelector("dialog .order-receipt").textContent.includes(' +
+        JSON.stringify(firstOrder.number) +
+        ")",
+    ),
+  );
+  click('dialog [aria-label="Close dialog"]');
   shot("confirmation");
   go("my-orders");
   assert(
@@ -247,13 +281,13 @@ try {
 
   for (const viewport of [["390", "844"], ["768", "1024"]]) {
     call("set", "viewport", ...viewport);
-    for (const route of ["owner", "staff", "products", "manage-orders", "inventory", "reports", "staff-management", "settings", "staff-reports"]) {
+    for (const route of ["owner", "staff", "products", "manage-orders", "inventory", "reports", "staff-management", "activity", "settings", "staff-reports"]) {
       go(route);
       assert(evaluate("document.documentElement.scrollWidth <= innerWidth"), route + " overflow at " + viewport[0]);
     }
   }
   call("set", "viewport", "1440", "1000");
-  pass("All 9 owner/staff screens stay inside tablet and mobile viewports");
+  pass("All 10 owner/staff screens stay inside tablet and mobile viewports");
 
   go("manage-orders?order=" + firstOrder.id);
   assert(
@@ -261,6 +295,8 @@ try {
       'document.body.innerText.includes("Pending verification")',
     ),
   );
+  assert(evaluate('document.body.innerText.includes("1234567890123")'));
+  assert(evaluate('document.querySelector(".status-history-card") !== null'));
   click('[aria-label="Mark GCash payment as verified"]');
   pause();
   assert.equal(
@@ -367,6 +403,11 @@ try {
   clickText("Add Stock", "dialog");
   assert.equal(products().find((p) => p.id === "TME-001").stock, 20);
   assert(products().find((p) => p.id === "TME-001").available);
+  assert(
+    evaluate(
+      'document.querySelector(".inventory-ledger").textContent.includes("New finished-product stock received")',
+    ),
+  );
   pass("Owner restock updates stock and restores sold-out availability");
 
   go("products");
@@ -414,6 +455,17 @@ try {
   assert(evaluate('document.body.innerText.includes("staff@tita-qa.example")'));
   shot("staff-management-dark");
   pass("Owner can create a staff account");
+
+  go("activity");
+  assert(evaluate('document.querySelector(".activity-list") !== null'));
+  assert(
+    evaluate(
+      'document.body.innerText.includes("Created staff account for QA Staff")',
+    ),
+  );
+  click('[aria-label^="Notifications"]');
+  assert(evaluate('document.querySelector(".notification-panel") !== null'));
+  pass("Owner audit log and in-app notification center show operational events");
 
   go("logout");
   clickText("Logout");

@@ -21,6 +21,7 @@ export default function Sidebar({ role = "Owner / Admin" }) {
         ["inventory", "inventory", "Inventory"],
         ["reports", "chart", "Reports"],
         ["staff-management", "users", "Staff"],
+        ["activity", "activity", "Activity Log"],
         ["settings", "settings", "Settings"],
       ];
   return (

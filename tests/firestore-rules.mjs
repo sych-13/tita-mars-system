@@ -68,6 +68,13 @@ const order = (id, customerId, overrides = {}) => {
       payment === "gcash" ? "Pending Verification" : "Not Required",
     paymentVerifiedAt: null,
     paymentVerifiedBy: null,
+    gcashReference: "",
+    gcashSenderName: "",
+    gcashPaidAt: null,
+    gcashPaymentNote: "",
+    paymentSubmittedAt: null,
+    fulfillmentTiming: "asap",
+    scheduledFor: null,
     subtotal: 70,
     deliveryFee: 0,
     total: 70,
@@ -84,6 +91,15 @@ const order = (id, customerId, overrides = {}) => {
     createdAt: iso(),
     updatedAt: iso(),
     inventoryDeductedAt: null,
+    statusHistory: [
+      {
+        status: "Pending",
+        at: iso(),
+        actorId: customerId,
+        actorName: "Test Customer",
+        actorRole: "customer",
+      },
+    ],
     ...overrides,
   };
 };
@@ -97,7 +113,42 @@ const storeSettings = {
   deliveryFee: 20,
   gcashName: "Tita Mars",
   gcashNumber: "09123456789",
+  orderingEnabled: true,
+  openingTime: "06:00",
+  closingTime: "21:00",
+  allowScheduledOrders: true,
+  maxScheduleDays: 7,
 };
+
+const movement = (id, actorId = "staff-1") => ({
+  id,
+  productId: "TME-001",
+  productName: "Adobo",
+  supplier: "Tita Mars Eatery",
+  type: "restock",
+  quantity: 5,
+  beforeStock: 20,
+  afterStock: 25,
+  orderId: "",
+  orderNumber: "",
+  reason: "Supplier delivery received",
+  actorId,
+  actorName: "Staff",
+  actorRole: "staff",
+  createdAt: iso(1),
+});
+
+const auditLog = (id, actorId = "staff-1") => ({
+  id,
+  action: "restock_product",
+  entityType: "inventory",
+  entityId: "TME-001",
+  summary: "Added 5 units to Adobo.",
+  actorId,
+  actorName: "Staff",
+  actorRole: "staff",
+  createdAt: iso(1),
+});
 
 async function seed() {
   await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -255,6 +306,60 @@ test("staff can verify only GCash payments and customers cannot self-verify", as
       paymentVerifiedBy: null,
       updatedAt: iso(2),
     }),
+  );
+});
+
+test("customers can submit GCash details but cannot alter payment state", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "orders/gcash-details"),
+      order("gcash-details", "customer-a", { payment: "gcash" }),
+    );
+  });
+  const db = testEnv.authenticatedContext("customer-a").firestore();
+  const orderRef = doc(db, "orders/gcash-details");
+  await assertSucceeds(
+    updateDoc(orderRef, {
+      gcashReference: "1234567890123",
+      gcashSenderName: "Customer A",
+      gcashPaidAt: iso(1),
+      gcashPaymentNote: "Paid in full",
+      paymentSubmittedAt: iso(2),
+      updatedAt: iso(2),
+    }),
+  );
+  await assertFails(
+    updateDoc(orderRef, {
+      gcashReference: "ABC",
+      gcashSenderName: "Customer A",
+      gcashPaidAt: iso(1),
+      gcashPaymentNote: "",
+      paymentSubmittedAt: iso(2),
+      updatedAt: iso(2),
+    }),
+  );
+});
+
+test("staff can append valid inventory and audit records only as themselves", async () => {
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  const customerDb = testEnv.authenticatedContext("customer-a").firestore();
+  await assertSucceeds(
+    setDoc(doc(staffDb, "inventoryMovements/move-1"), movement("move-1")),
+  );
+  await assertSucceeds(
+    setDoc(doc(staffDb, "auditLogs/log-1"), auditLog("log-1")),
+  );
+  await assertFails(
+    setDoc(
+      doc(staffDb, "inventoryMovements/forged"),
+      movement("forged", "owner-1"),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      doc(customerDb, "auditLogs/customer-log"),
+      auditLog("customer-log", "customer-a"),
+    ),
   );
 });
 

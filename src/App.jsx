@@ -27,6 +27,8 @@ import StaffManagement from "./components/StaffManagement";
 import SettingsPage from "./components/SettingsPage";
 import LogoutPage from "./components/LogoutPage";
 import Icon from "./components/Icon";
+import { ActivityProvider } from "./context/ActivityContext";
+import ActivityLogPage from "./components/ActivityLogPage";
 
 function CustomerPage({ children }) {
   return <CustomerLayout>{children}</CustomerLayout>;
@@ -245,6 +247,12 @@ function AppViews() {
           <SettingsPage />
         </AccessRequired>
       );
+    case "activity":
+      return (
+        <AccessRequired allowed={["owner"]}>
+          <ActivityLogPage />
+        </AccessRequired>
+      );
     default:
       return <NotFoundPage />;
   }
@@ -254,15 +262,17 @@ export default function App() {
   return (
     <ThemeProvider>
       <SessionProvider>
-        <ShopProvider>
-          <ProductProvider>
-            <OrdersProvider>
-              <CartProvider>
-                <AppViews />
-              </CartProvider>
-            </OrdersProvider>
-          </ProductProvider>
-        </ShopProvider>
+        <ActivityProvider>
+          <ShopProvider>
+            <ProductProvider>
+              <OrdersProvider>
+                <CartProvider>
+                  <AppViews />
+                </CartProvider>
+              </OrdersProvider>
+            </ProductProvider>
+          </ShopProvider>
+        </ActivityProvider>
       </SessionProvider>
     </ThemeProvider>
   );

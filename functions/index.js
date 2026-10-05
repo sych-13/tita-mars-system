@@ -30,6 +30,62 @@ const callableOptions = {
 const cleanText = (value, maxLength) =>
   typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 
+const manilaMinutes = (value) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const mapped = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Number(mapped.hour) * 60 + Number(mapped.minute);
+};
+
+const timeMinutes = (value, fallback) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || ""));
+  if (!match) return fallback;
+  const minutes = Number(match[1]) * 60 + Number(match[2]);
+  return minutes >= 0 && minutes < 1440 ? minutes : fallback;
+};
+
+const openAt = (settings, date) => {
+  const opens = timeMinutes(settings.openingTime, 360);
+  const closes = timeMinutes(settings.closingTime, 1260);
+  if (opens === closes) return true;
+  const current = manilaMinutes(date);
+  return opens < closes
+    ? current >= opens && current < closes
+    : current >= opens || current < closes;
+};
+
+const validateSchedule = (settings, timing, value) => {
+  if (settings.orderingEnabled === false)
+    throw businessError("Online ordering is currently paused.");
+  const now = new Date();
+  if (timing !== "scheduled") {
+    if (!openAt(settings, now))
+      throw businessError(
+        settings.allowScheduledOrders === false
+          ? "The store is currently closed."
+          : "The store is closed right now. Choose a scheduled pickup or delivery time.",
+      );
+    return null;
+  }
+  if (settings.allowScheduledOrders === false)
+    throw businessError("Scheduled orders are not enabled.");
+  const scheduled = new Date(value);
+  if (!value || Number.isNaN(scheduled.getTime()))
+    throw businessError("Choose a valid order date and time.", "invalid-argument");
+  if (scheduled.getTime() < now.getTime() + 15 * 60 * 1000)
+    throw businessError("Scheduled orders must be at least 15 minutes from now.");
+  const maxDays = Math.min(30, Math.max(1, Number(settings.maxScheduleDays) || 7));
+  if (scheduled.getTime() > now.getTime() + maxDays * 86400000)
+    throw businessError(`Choose a schedule within the next ${maxDays} days.`);
+  if (!openAt(settings, scheduled))
+    throw businessError("Choose a time within the configured store hours.");
+  return scheduled.toISOString();
+};
+
 const businessError = (message, code = "failed-precondition") =>
   new HttpsError(code, message);
 
@@ -98,6 +154,17 @@ exports.createOrder = onCall(callableOptions, async (request) => {
   const notes = cleanText(input.notes, 600);
   const orderType = cleanText(input.orderType, 20).toLowerCase();
   const payment = cleanText(input.payment, 20).toLowerCase();
+  const fulfillmentTiming =
+    cleanText(input.fulfillmentTiming, 20) === "scheduled"
+      ? "scheduled"
+      : "asap";
+  const gcashReference =
+    payment === "gcash" ? cleanText(input.gcashReference, 20).replace(/\s+/g, "") : "";
+  const gcashSenderName =
+    payment === "gcash" ? cleanText(input.gcashSenderName, 120) : "";
+  const gcashPaymentNote =
+    payment === "gcash" ? cleanText(input.gcashPaymentNote, 300) : "";
+  const gcashPaidAt = input.gcashPaidAt ? new Date(input.gcashPaidAt) : null;
 
   if (!customer || !phone || (orderType === "delivery" && !address))
     throw businessError(
@@ -111,6 +178,20 @@ exports.createOrder = onCall(callableOptions, async (request) => {
   if (orderType === "delivery" && !DELIVERY_AREAS.has(deliveryArea))
     throw businessError(
       "Delivery is currently available only in Taytay and Cainta.",
+      "invalid-argument",
+    );
+  if (gcashReference && !/^\d{8,20}$/.test(gcashReference))
+    throw businessError(
+      "GCash reference number must contain 8 to 20 digits.",
+      "invalid-argument",
+    );
+  if (
+    payment === "gcash" &&
+    (gcashReference || gcashSenderName || gcashPaidAt) &&
+    (!gcashReference || !gcashSenderName || !gcashPaidAt || Number.isNaN(gcashPaidAt.getTime()))
+  )
+    throw businessError(
+      "Enter the GCash reference, sender name, and payment time together.",
       "invalid-argument",
     );
 
@@ -128,6 +209,12 @@ exports.createOrder = onCall(callableOptions, async (request) => {
         transaction.get(settingsRef),
       ]);
       const settingsSnapshot = snapshots.pop();
+      const storeSettings = settingsSnapshot.exists ? settingsSnapshot.data() : {};
+      const scheduledFor = validateSchedule(
+        storeSettings,
+        fulfillmentTiming,
+        input.scheduledFor,
+      );
       const productSnapshots = snapshots;
       const items = productSnapshots.map((snapshot, index) => {
         const productId = productRefs[index].id;
@@ -164,7 +251,7 @@ exports.createOrder = onCall(callableOptions, async (request) => {
         0,
       );
       const configuredFee = Number(
-        settingsSnapshot.exists ? settingsSnapshot.data().deliveryFee : 20,
+        settingsSnapshot.exists ? storeSettings.deliveryFee : 20,
       );
       const deliveryFee =
         orderType === "delivery" && Number.isSafeInteger(configuredFee)
@@ -186,6 +273,13 @@ exports.createOrder = onCall(callableOptions, async (request) => {
           payment === "gcash" ? "Pending Verification" : "Not Required",
         paymentVerifiedAt: null,
         paymentVerifiedBy: null,
+        gcashReference,
+        gcashSenderName,
+        gcashPaidAt: gcashPaidAt?.toISOString() || null,
+        gcashPaymentNote,
+        paymentSubmittedAt: gcashReference ? timestamp : null,
+        fulfillmentTiming,
+        scheduledFor,
         subtotal,
         deliveryFee,
         total: subtotal + deliveryFee,
@@ -195,6 +289,15 @@ exports.createOrder = onCall(callableOptions, async (request) => {
         createdAt: timestamp,
         updatedAt: timestamp,
         inventoryDeductedAt: null,
+        statusHistory: [
+          {
+            status: "Pending",
+            at: timestamp,
+            actorId: request.auth.uid,
+            actorName: customer,
+            actorRole: "customer",
+          },
+        ],
       };
       transaction.create(orderRef, createdOrder);
     });
@@ -210,7 +313,7 @@ exports.createOrder = onCall(callableOptions, async (request) => {
 exports.updateOrderStatus = onCall(callableOptions, async (request) => {
   if (!request.auth)
     throw businessError("Sign in before updating an order.", "unauthenticated");
-  await requireActiveProfile(request.auth.uid, ["staff", "owner"]);
+  const actor = await requireActiveProfile(request.auth.uid, ["staff", "owner"]);
 
   const orderId = cleanText(request.data?.orderId, 128);
   const requestedStatus = cleanText(request.data?.status, 40);
@@ -229,7 +332,22 @@ exports.updateOrderStatus = onCall(callableOptions, async (request) => {
         );
 
       const timestamp = new Date().toISOString();
-      const changes = { status: requestedStatus, updatedAt: timestamp };
+      const statusEntry = {
+        status: requestedStatus,
+        at: timestamp,
+        actorId: request.auth.uid,
+        actorName: cleanText(actor.name, 120) || actor.role,
+        actorRole: actor.role,
+      };
+      const history = Array.isArray(order.statusHistory)
+        ? order.statusHistory
+        : [];
+      const changes = {
+        status: requestedStatus,
+        updatedAt: timestamp,
+        statusHistory:
+          order.status === requestedStatus ? history : [...history, statusEntry],
+      };
       if (requestedStatus === "Completed" && !order.inventoryDeductedAt) {
         const quantities = normalizeCartItems(order.items);
         const productRefs = [...quantities.keys()].map((id) =>
@@ -258,10 +376,40 @@ exports.updateOrderStatus = onCall(callableOptions, async (request) => {
             available: stock > 0 ? product.available !== false : false,
             updatedAt: timestamp,
           });
+          const movementRef = db.collection("inventoryMovements").doc();
+          transaction.create(movementRef, {
+            id: movementRef.id,
+            productId: productRef.id,
+            productName: cleanText(product.name, 120),
+            supplier: cleanText(product.supplier, 120),
+            type: "order_deduction",
+            quantity: -quantities.get(productRef.id),
+            beforeStock: Number(product.stock),
+            afterStock: stock,
+            orderId,
+            orderNumber: cleanText(order.number, 80),
+            reason: `Completed order ${cleanText(order.number, 80)}`,
+            actorId: request.auth.uid,
+            actorName: cleanText(actor.name, 120) || actor.role,
+            actorRole: actor.role,
+            createdAt: timestamp,
+          });
         });
         changes.inventoryDeductedAt = timestamp;
       }
       transaction.update(orderRef, changes);
+      const auditRef = db.collection("auditLogs").doc();
+      transaction.create(auditRef, {
+        id: auditRef.id,
+        action: "update_order_status",
+        entityType: "order",
+        entityId: orderId,
+        summary: `Updated ${cleanText(order.number, 80)} to ${requestedStatus}.`,
+        actorId: request.auth.uid,
+        actorName: cleanText(actor.name, 120) || actor.role,
+        actorRole: actor.role,
+        createdAt: timestamp,
+      });
     });
   } catch (error) {
     if (error instanceof HttpsError) throw error;
@@ -275,7 +423,7 @@ exports.updateOrderStatus = onCall(callableOptions, async (request) => {
 exports.updatePaymentStatus = onCall(callableOptions, async (request) => {
   if (!request.auth)
     throw businessError("Sign in before updating a payment.", "unauthenticated");
-  await requireActiveProfile(request.auth.uid, ["staff", "owner"]);
+  const actor = await requireActiveProfile(request.auth.uid, ["staff", "owner"]);
 
   const orderId = cleanText(request.data?.orderId, 128);
   const paymentStatus = cleanText(request.data?.paymentStatus, 40);
@@ -303,6 +451,19 @@ exports.updatePaymentStatus = onCall(callableOptions, async (request) => {
         paymentVerifiedBy:
           paymentStatus === "Verified" ? request.auth.uid : null,
         updatedAt: timestamp,
+      });
+      const auditRef = db.collection("auditLogs").doc();
+      transaction.create(auditRef, {
+        id: auditRef.id,
+        action:
+          paymentStatus === "Verified" ? "verify_payment" : "reopen_payment",
+        entityType: "payment",
+        entityId: orderId,
+        summary: `${cleanText(orderSnapshot.data().number, 80)} payment marked ${paymentStatus.toLowerCase()}.`,
+        actorId: request.auth.uid,
+        actorName: cleanText(actor.name, 120) || actor.role,
+        actorRole: actor.role,
+        createdAt: timestamp,
       });
     });
   } catch (error) {

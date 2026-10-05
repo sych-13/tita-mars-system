@@ -32,6 +32,9 @@ import {
 import { readStorage, writeStorage } from "../utils/storage";
 import { useProducts } from "./ProductContext";
 import { useSession } from "./SessionContext";
+import { useShop } from "./ShopContext";
+import { useActivity } from "./ActivityContext";
+import { validateOrderSchedule } from "../utils/businessHours";
 
 const OrdersContext = createContext();
 const STORAGE_KEY = "tita-mars-orders-v2";
@@ -77,6 +80,31 @@ const normalizeOrder = (order) => ({
   createdAt: toIsoDate(order.createdAt),
   updatedAt: toIsoDate(order.updatedAt),
   inventoryDeductedAt: toIsoDate(order.inventoryDeductedAt),
+  scheduledFor: toIsoDate(order.scheduledFor),
+  fulfillmentTiming:
+    order.fulfillmentTiming === "scheduled" ? "scheduled" : "asap",
+  gcashReference:
+    typeof order.gcashReference === "string" ? order.gcashReference : "",
+  gcashSenderName:
+    typeof order.gcashSenderName === "string" ? order.gcashSenderName : "",
+  gcashPaidAt: toIsoDate(order.gcashPaidAt),
+  gcashPaymentNote:
+    typeof order.gcashPaymentNote === "string" ? order.gcashPaymentNote : "",
+  paymentSubmittedAt: toIsoDate(order.paymentSubmittedAt),
+  statusHistory: Array.isArray(order.statusHistory)
+    ? order.statusHistory.map((entry) => ({
+        ...entry,
+        at: toIsoDate(entry.at),
+      }))
+    : [
+        {
+          status: order.status || "Pending",
+          at: toIsoDate(order.createdAt),
+          actorId: order.customerId || "system",
+          actorName: order.customer || "Customer",
+          actorRole: "customer",
+        },
+      ],
   items: Array.isArray(order.items) ? order.items : [],
 });
 
@@ -92,6 +120,8 @@ const orderError = (error, fallback) => {
 export function OrdersProvider({ children }) {
   const { deductInventory, validateOrderItems } = useProducts();
   const { user, role } = useSession();
+  const { settings } = useShop();
+  const { logActivity } = useActivity();
   const [orders, setOrders] = useState(() =>
     firebaseConfigured ? [] : loadLegacyOrders().map(normalizeOrder),
   );
@@ -167,6 +197,26 @@ export function OrdersProvider({ children }) {
           ok: false,
           error: "Delivery is currently available only in Taytay and Cainta.",
         };
+      const schedule = validateOrderSchedule(
+        settings,
+        data.fulfillmentTiming,
+        data.scheduledFor,
+      );
+      if (!schedule.ok) return schedule;
+      const gcashReference =
+        data.payment === "gcash"
+          ? String(data.gcashReference || "").replace(/\s+/g, "")
+          : "";
+      if (gcashReference && !/^\d{8,20}$/.test(gcashReference))
+        return {
+          ok: false,
+          error: "GCash reference number must contain 8 to 20 digits.",
+        };
+      const gcashPaidAt = data.gcashPaidAt
+        ? new Date(data.gcashPaidAt)
+        : null;
+      if (gcashPaidAt && Number.isNaN(gcashPaidAt.getTime()))
+        return { ok: false, error: "Enter a valid GCash payment date." };
       const timestamp = new Date().toISOString();
 
       if (firebaseConfigured && firestore) {
@@ -188,6 +238,19 @@ export function OrdersProvider({ children }) {
               notes: data.notes?.trim() || "",
               orderType: data.orderType,
               payment: data.payment,
+              fulfillmentTiming:
+                data.fulfillmentTiming === "scheduled" ? "scheduled" : "asap",
+              scheduledFor: schedule.scheduledFor,
+              gcashReference,
+              gcashSenderName:
+                data.payment === "gcash"
+                  ? data.gcashSenderName?.trim().slice(0, 120) || ""
+                  : "",
+              gcashPaidAt: gcashPaidAt?.toISOString() || null,
+              gcashPaymentNote:
+                data.payment === "gcash"
+                  ? data.gcashPaymentNote?.trim().slice(0, 300) || ""
+                  : "",
               items: data.items.map(({ id, quantity }) => ({ id, quantity })),
             });
             const orderData = response.data?.order;
@@ -276,6 +339,21 @@ export function OrdersProvider({ children }) {
                   : "Not Required",
               paymentVerifiedAt: null,
               paymentVerifiedBy: null,
+              gcashReference,
+              gcashSenderName:
+                data.payment === "gcash"
+                  ? data.gcashSenderName?.trim().slice(0, 120) || ""
+                  : "",
+              gcashPaidAt: gcashPaidAt?.toISOString() || null,
+              gcashPaymentNote:
+                data.payment === "gcash"
+                  ? data.gcashPaymentNote?.trim().slice(0, 300) || ""
+                  : "",
+              paymentSubmittedAt:
+                data.payment === "gcash" && gcashReference ? timestamp : null,
+              fulfillmentTiming:
+                data.fulfillmentTiming === "scheduled" ? "scheduled" : "asap",
+              scheduledFor: schedule.scheduledFor,
               subtotal,
               deliveryFee,
               total: subtotal + deliveryFee,
@@ -288,6 +366,15 @@ export function OrdersProvider({ children }) {
               createdAt: timestamp,
               updatedAt: timestamp,
               inventoryDeductedAt: null,
+              statusHistory: [
+                {
+                  status: "Pending",
+                  at: timestamp,
+                  actorId: user.id,
+                  actorName: customer.slice(0, 120),
+                  actorRole: "customer",
+                },
+              ],
             };
             transaction.set(orderRef, order);
           });
@@ -310,14 +397,38 @@ export function OrdersProvider({ children }) {
           data.payment === "gcash" ? "Pending Verification" : "Not Required",
         paymentVerifiedAt: null,
         paymentVerifiedBy: null,
+        gcashReference,
+        gcashSenderName:
+          data.payment === "gcash"
+            ? data.gcashSenderName?.trim().slice(0, 120) || ""
+            : "",
+        gcashPaidAt: gcashPaidAt?.toISOString() || null,
+        gcashPaymentNote:
+          data.payment === "gcash"
+            ? data.gcashPaymentNote?.trim().slice(0, 300) || ""
+            : "",
+        paymentSubmittedAt:
+          data.payment === "gcash" && gcashReference ? timestamp : null,
+        fulfillmentTiming:
+          data.fulfillmentTiming === "scheduled" ? "scheduled" : "asap",
+        scheduledFor: schedule.scheduledFor,
         createdAt: timestamp,
         updatedAt: timestamp,
         inventoryDeductedAt: null,
+        statusHistory: [
+          {
+            status: "Pending",
+            at: timestamp,
+            actorId: user?.id || "local-customer",
+            actorName: customer.slice(0, 120),
+            actorRole: "customer",
+          },
+        ],
       };
       commitOrders((current) => [order, ...current]);
       return { ok: true, order };
     },
-    [commitOrders, user, validateOrderItems],
+    [commitOrders, settings, user, validateOrderItems],
   );
 
   const updateOrderStatus = useCallback(
@@ -361,7 +472,21 @@ export function OrdersProvider({ children }) {
               );
 
             const timestamp = new Date().toISOString();
-            const changes = { status, updatedAt: timestamp };
+            const statusEntry = {
+              status,
+              at: timestamp,
+              actorId: user.id,
+              actorName: user.name || role,
+              actorRole: role,
+            };
+            const changes = {
+              status,
+              updatedAt: timestamp,
+              statusHistory:
+                status === current.status
+                  ? current.statusHistory
+                  : [...current.statusHistory, statusEntry],
+            };
             if (status === "Completed" && !current.inventoryDeductedAt) {
               const summary = summarizeOrderItems(current.items);
               if (!summary.ok)
@@ -387,18 +512,45 @@ export function OrdersProvider({ children }) {
               productSnapshots.forEach((productSnapshot, index) => {
                 const productRef = productRefs[index];
                 const product = productSnapshot.data();
+                const quantity = summary.quantities.get(productRef.id);
                 const stock =
                   Number(product.stock || 0) -
-                  summary.quantities.get(productRef.id);
+                  quantity;
                 transaction.update(productRef, {
                   stock,
                   available: stock > 0 ? product.available !== false : false,
                   updatedAt: timestamp,
                 });
+                const movementRef = doc(
+                  collection(firestore, "inventoryMovements"),
+                );
+                transaction.set(movementRef, {
+                  id: movementRef.id,
+                  productId: productRef.id,
+                  productName: product.name,
+                  supplier: product.supplier,
+                  type: "order_deduction",
+                  quantity: -quantity,
+                  beforeStock: Number(product.stock || 0),
+                  afterStock: stock,
+                  orderId: current.id,
+                  orderNumber: current.number,
+                  reason: `Completed order ${current.number}`,
+                  actorId: user.id,
+                  actorName: user.name || role,
+                  actorRole: role,
+                  createdAt: timestamp,
+                });
               });
               changes.inventoryDeductedAt = timestamp;
             }
             transaction.update(orderRef, changes);
+          });
+          await logActivity({
+            action: "update_order_status",
+            entityType: "order",
+            entityId: id,
+            summary: `Updated ${ordersRef.current.find((order) => order.id === id)?.number || id} to ${status}.`,
           });
           return { ok: true };
         } catch (error) {
@@ -424,7 +576,7 @@ export function OrdersProvider({ children }) {
 
       let deductedAt = target.inventoryDeductedAt;
       if (status === "Completed" && !deductedAt) {
-        const result = deductInventory(target.items);
+        const result = deductInventory(target.items, target);
         if (!result.ok) return result;
         deductedAt = result.deductedAt;
       }
@@ -433,9 +585,22 @@ export function OrdersProvider({ children }) {
         current.map((order) =>
           order.id === id
             ? {
-                ...order,
-                status,
-                updatedAt: timestamp,
+              ...order,
+              status,
+              updatedAt: timestamp,
+              statusHistory:
+                status === order.status
+                  ? order.statusHistory
+                  : [
+                      ...order.statusHistory,
+                      {
+                        status,
+                        at: timestamp,
+                        actorId: user?.id || role,
+                        actorName: user?.name || role,
+                        actorRole: role,
+                      },
+                    ],
                 inventoryDeductedAt:
                   status === "Completed"
                     ? order.inventoryDeductedAt || deductedAt
@@ -444,9 +609,15 @@ export function OrdersProvider({ children }) {
             : order,
         ),
       );
+      await logActivity({
+        action: "update_order_status",
+        entityType: "order",
+        entityId: id,
+        summary: `Updated ${target.number} to ${status}.`,
+      });
       return { ok: true };
     },
-    [commitOrders, deductInventory, role, user],
+    [commitOrders, deductInventory, logActivity, role, user],
   );
 
   const updatePaymentStatus = useCallback(
@@ -500,6 +671,15 @@ export function OrdersProvider({ children }) {
               updatedAt: timestamp,
             });
           });
+          await logActivity({
+            action:
+              paymentStatus === "Verified"
+                ? "verify_payment"
+                : "reopen_payment",
+            entityType: "payment",
+            entityId: id,
+            summary: `${target.number} payment marked ${paymentStatus.toLowerCase()}.`,
+          });
           return { ok: true };
         } catch (error) {
           return {
@@ -525,9 +705,96 @@ export function OrdersProvider({ children }) {
             : order,
         ),
       );
+      await logActivity({
+        action:
+          paymentStatus === "Verified" ? "verify_payment" : "reopen_payment",
+        entityType: "payment",
+        entityId: id,
+        summary: `${target.number} payment marked ${paymentStatus.toLowerCase()}.`,
+      });
       return { ok: true };
     },
-    [commitOrders, role, user],
+    [commitOrders, logActivity, role, user],
+  );
+
+  const submitPaymentDetails = useCallback(
+    async (id, details) => {
+      const target = ordersRef.current.find((order) => order.id === id);
+      if (!target) return { ok: false, error: "Order not found." };
+      if (target.payment !== "gcash")
+        return { ok: false, error: "This order does not use GCash." };
+      if (target.paymentStatus === "Verified")
+        return { ok: false, error: "This payment is already verified." };
+      const reference = String(details.reference || "").replace(/\s+/g, "");
+      const senderName = String(details.senderName || "").trim().slice(0, 120);
+      const paidAt = new Date(details.paidAt);
+      const note = String(details.note || "").trim().slice(0, 300);
+      if (!/^\d{8,20}$/.test(reference))
+        return {
+          ok: false,
+          error: "GCash reference number must contain 8 to 20 digits.",
+        };
+      if (!senderName)
+        return { ok: false, error: "Enter the GCash sender name." };
+      if (!details.paidAt || Number.isNaN(paidAt.getTime()))
+        return { ok: false, error: "Enter a valid payment date and time." };
+      const timestamp = new Date().toISOString();
+      const changes = {
+        gcashReference: reference,
+        gcashSenderName: senderName,
+        gcashPaidAt: paidAt.toISOString(),
+        gcashPaymentNote: note,
+        paymentSubmittedAt: timestamp,
+        updatedAt: timestamp,
+      };
+      if (firebaseConfigured && firestore) {
+        if (!user || target.customerId !== user.id)
+          return {
+            ok: false,
+            error: "Only the customer who placed this order can submit payment details.",
+          };
+        try {
+          await runTransaction(firestore, async (transaction) => {
+            const orderRef = doc(firestore, "orders", id);
+            const snapshot = await transaction.get(orderRef);
+            if (!snapshot.exists()) throw new Error("Order not found.");
+            const live = snapshot.data();
+            if (
+              live.customerId !== user.id ||
+              live.payment !== "gcash" ||
+              live.paymentStatus === "Verified"
+            )
+              throw new Error("Payment details can no longer be changed.");
+            transaction.update(orderRef, changes);
+          });
+          await logActivity({
+            action: "submit_payment_details",
+            entityType: "payment",
+            entityId: id,
+            summary: `Submitted GCash payment details for ${target.number}.`,
+          });
+          return { ok: true };
+        } catch (error) {
+          return {
+            ok: false,
+            error: orderError(error, "Unable to submit payment details."),
+          };
+        }
+      }
+      commitOrders((current) =>
+        current.map((order) =>
+          order.id === id ? { ...order, ...changes } : order,
+        ),
+      );
+      await logActivity({
+        action: "submit_payment_details",
+        entityType: "payment",
+        entityId: id,
+        summary: `Submitted GCash payment details for ${target.number}.`,
+      });
+      return { ok: true };
+    },
+    [commitOrders, logActivity, user],
   );
 
   const saveReview = useCallback(
@@ -581,6 +848,7 @@ export function OrdersProvider({ children }) {
       createOrder,
       updateOrderStatus,
       updatePaymentStatus,
+      submitPaymentDetails,
       saveReview,
     }),
     [
@@ -588,6 +856,7 @@ export function OrdersProvider({ children }) {
       orders,
       updateOrderStatus,
       updatePaymentStatus,
+      submitPaymentDetails,
       saveReview,
     ],
   );

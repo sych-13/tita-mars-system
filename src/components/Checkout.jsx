@@ -5,10 +5,16 @@ import { useSession } from "../context/SessionContext";
 import { useShop } from "../context/ShopContext";
 import { useHashRoute } from "../hooks/useHashRoute";
 import { peso } from "../utils/formatters";
+import {
+  isStoreOpen,
+  scheduleInputBounds,
+  storeHoursLabel,
+} from "../utils/businessHours";
 import gcashQrImage from "../assets/gcash-payment-qr.jpg";
 import OrderStatusBadge from "./OrderStatusBadge";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 import Icon from "./Icon";
+import OrderReceipt from "./OrderReceipt";
 
 function GcashPaymentPanel({ amount, settings, confirmation = false }) {
   const accountDetails = [settings.gcashName, settings.gcashNumber]
@@ -66,6 +72,12 @@ export default function Checkout() {
   const { params, navigate } = useHashRoute();
   const [orderType, setOrderType] = useState("pickup");
   const [payment, setPayment] = useState("cash");
+  const [fulfillmentTiming, setFulfillmentTiming] = useState(() =>
+    isStoreOpen(settings) ? "asap" : "scheduled",
+  );
+  const scheduleBounds = scheduleInputBounds(settings);
+  const [scheduledFor, setScheduledFor] = useState(scheduleBounds.suggested);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [form, setForm] = useState({
     name: user?.name || "",
     phone: user?.phone || "",
@@ -73,6 +85,10 @@ export default function Checkout() {
     address: user?.address || "",
     area: "Taytay",
     notes: "",
+    gcashReference: "",
+    gcashSenderName: "",
+    gcashPaidAt: "",
+    gcashPaymentNote: "",
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,6 +105,11 @@ export default function Checkout() {
   useEffect(() => {
     if (order) confirmationRef.current?.focus();
   }, [order?.id]);
+  useEffect(() => {
+    if (!isStoreOpen(settings) && settings.allowScheduledOrders) {
+      setFulfillmentTiming("scheduled");
+    }
+  }, [settings]);
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
   const submit = async (e) => {
     e.preventDefault();
@@ -99,6 +120,21 @@ export default function Checkout() {
       (orderType === "delivery" && !form.address.trim())
     ) {
       setError("Please complete your contact and delivery details.");
+      return;
+    }
+    const hasPaymentDetails = Boolean(
+      form.gcashReference || form.gcashSenderName || form.gcashPaidAt,
+    );
+    if (
+      payment === "gcash" &&
+      hasPaymentDetails &&
+      (!/^\d{8,20}$/.test(form.gcashReference.replace(/\s+/g, "")) ||
+        !form.gcashSenderName.trim() ||
+        !form.gcashPaidAt)
+    ) {
+      setError(
+        "To submit GCash payment details now, enter the reference number, sender name, and payment time.",
+      );
       return;
     }
     submitting.current = true;
@@ -114,6 +150,16 @@ export default function Checkout() {
       notes: form.notes.trim(),
       orderType,
       payment,
+      fulfillmentTiming,
+      scheduledFor:
+        fulfillmentTiming === "scheduled" ? scheduledFor : null,
+      gcashReference:
+        payment === "gcash" ? form.gcashReference.replace(/\s+/g, "") : "",
+      gcashSenderName:
+        payment === "gcash" ? form.gcashSenderName.trim() : "",
+      gcashPaidAt: payment === "gcash" ? form.gcashPaidAt : "",
+      gcashPaymentNote:
+        payment === "gcash" ? form.gcashPaymentNote.trim() : "",
       subtotal: total,
       deliveryFee,
       total: grandTotal,
@@ -186,8 +232,22 @@ export default function Checkout() {
               <a className="btn-secondary" href="#home">
                 Back to home
               </a>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowReceipt(true)}
+              >
+                <Icon name="receipt" size={16} /> View receipt
+              </button>
             </div>
           </div>
+          {showReceipt && (
+            <OrderReceipt
+              order={order}
+              settings={settings}
+              onClose={() => setShowReceipt(false)}
+            />
+          )}
         </div>
       </section>
     );
@@ -323,6 +383,68 @@ export default function Checkout() {
                     <small>Delivery fee: {peso.format(deliveryFee)}</small>
                   </div>
                 )}
+                <div className="fulfillment-timing">
+                  <div className="timing-heading">
+                    <strong>When should we prepare it?</strong>
+                    <small>Store hours: {storeHoursLabel(settings)}</small>
+                  </div>
+                  <div className="order-type-options">
+                    <label
+                      className={`select-card ${fulfillmentTiming === "asap" ? "selected" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="fulfillment-timing"
+                        value="asap"
+                        checked={fulfillmentTiming === "asap"}
+                        onChange={() => setFulfillmentTiming("asap")}
+                        disabled={!isStoreOpen(settings)}
+                      />
+                      <Icon name="clock" size={22} />
+                      <span>
+                        <strong>As soon as possible</strong>
+                        <small>
+                          {isStoreOpen(settings)
+                            ? "Order during today's hours"
+                            : "Store is currently closed"}
+                        </small>
+                      </span>
+                    </label>
+                    <label
+                      className={`select-card ${fulfillmentTiming === "scheduled" ? "selected" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="fulfillment-timing"
+                        value="scheduled"
+                        checked={fulfillmentTiming === "scheduled"}
+                        onChange={() => setFulfillmentTiming("scheduled")}
+                        disabled={!settings.allowScheduledOrders}
+                      />
+                      <Icon name="calendar" size={22} />
+                      <span>
+                        <strong>Schedule for later</strong>
+                        <small>
+                          Up to {settings.maxScheduleDays || 7} days ahead
+                        </small>
+                      </span>
+                    </label>
+                  </div>
+                  {fulfillmentTiming === "scheduled" && (
+                    <label className="schedule-field">
+                      Preferred date and time
+                      <input
+                        type="datetime-local"
+                        value={scheduledFor}
+                        min={scheduleBounds.min}
+                        max={scheduleBounds.max}
+                        step="900"
+                        onChange={(event) => setScheduledFor(event.target.value)}
+                        required
+                      />
+                    </label>
+                  )}
+                </div>
               </fieldset>
               <fieldset>
                 <legend>
@@ -360,7 +482,64 @@ export default function Checkout() {
                   ))}
                 </div>
                 {payment === "gcash" && (
-                  <GcashPaymentPanel amount={grandTotal} settings={settings} />
+                  <>
+                    <GcashPaymentPanel
+                      amount={grandTotal}
+                      settings={settings}
+                    />
+                    <div className="gcash-details-form">
+                      <div className="timing-heading">
+                        <strong>Already paid?</strong>
+                        <small>
+                          Optional now. You can submit these details from My
+                          Orders later.
+                        </small>
+                      </div>
+                      <div className="form-grid">
+                        <label>
+                          Reference number
+                          <input
+                            name="gcashReference"
+                            inputMode="numeric"
+                            pattern="[0-9]{8,20}"
+                            maxLength="20"
+                            value={form.gcashReference}
+                            onChange={update}
+                            placeholder="8–20 digits"
+                          />
+                        </label>
+                        <label>
+                          Sender name
+                          <input
+                            name="gcashSenderName"
+                            value={form.gcashSenderName}
+                            onChange={update}
+                            maxLength="120"
+                            placeholder="Name shown in GCash"
+                          />
+                        </label>
+                        <label>
+                          Date and time paid
+                          <input
+                            type="datetime-local"
+                            name="gcashPaidAt"
+                            value={form.gcashPaidAt}
+                            onChange={update}
+                          />
+                        </label>
+                        <label>
+                          Payment note (optional)
+                          <input
+                            name="gcashPaymentNote"
+                            value={form.gcashPaymentNote}
+                            onChange={update}
+                            maxLength="300"
+                            placeholder="Extra payment detail"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </>
                 )}
               </fieldset>
               <fieldset>

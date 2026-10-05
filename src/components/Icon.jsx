@@ -48,6 +48,9 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   CalendarBlank,
+  Bell,
+  Receipt,
+  ListChecks,
 } from "@phosphor-icons/react";
 
 const icons = {
@@ -101,6 +104,9 @@ const icons = {
   shield: ShieldCheck,
   filter: SlidersHorizontal,
   calendar: CalendarBlank,
+  bell: Bell,
+  receipt: Receipt,
+  activity: ListChecks,
 };
 export default function Icon({
   name,

@@ -12,7 +12,6 @@ import {
   doc,
   onSnapshot,
   runTransaction,
-  updateDoc,
 } from "firebase/firestore";
 import { catalogCategories, seedProducts } from "../data/products";
 import { imageForProduct } from "../data/productImages";
@@ -21,9 +20,12 @@ import { normalizeAssetUrl } from "../utils/assets";
 import { toIsoDate } from "../utils/formatters";
 import { summarizeOrderItems } from "../utils/orderFlow";
 import { readStorage, writeStorage } from "../utils/storage";
+import { useActivity } from "./ActivityContext";
+import { useSession } from "./SessionContext";
 
 const ProductContext = createContext();
 const STORAGE_KEY = "tita-mars-products-v2";
+const MOVEMENT_STORAGE_KEY = "tita-mars-inventory-movements-v1";
 const LOW_STOCK_LIMIT = 5;
 const PRODUCT_CATEGORIES = catalogCategories.slice(1);
 const PRODUCT_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,39}$/;
@@ -82,6 +84,18 @@ const getInitialProducts = () => {
     : cloneSeedProducts();
 };
 
+const createId = (prefix) =>
+  globalThis.crypto?.randomUUID?.() ||
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const normalizeMovement = (movement) => ({
+  ...movement,
+  quantity: Number(movement.quantity) || 0,
+  beforeStock: Number(movement.beforeStock) || 0,
+  afterStock: Number(movement.afterStock) || 0,
+  createdAt: toIsoDate(movement.createdAt),
+});
+
 const productError = (error, fallback) =>
   error?.code === "permission-denied" ||
   error?.code === "firestore/permission-denied"
@@ -106,8 +120,16 @@ const validateProduct = (product) => {
 };
 
 export function ProductProvider({ children }) {
+  const { user, role } = useSession();
+  const { logActivity } = useActivity();
   const [products, setProducts] = useState(getInitialProducts);
   const productsRef = useRef(products);
+  const [inventoryMovements, setInventoryMovements] = useState(() =>
+    firebaseConfigured
+      ? []
+      : readStorage(MOVEMENT_STORAGE_KEY, []).map(normalizeMovement),
+  );
+  const movementsRef = useRef(inventoryMovements);
 
   const commitProducts = useCallback((updater) => {
     const current = productsRef.current;
@@ -118,9 +140,32 @@ export function ProductProvider({ children }) {
     return sorted;
   }, []);
 
+  const commitMovements = useCallback((updater) => {
+    const next =
+      typeof updater === "function"
+        ? updater(movementsRef.current)
+        : updater;
+    const sorted = [...next]
+      .sort((left, right) =>
+        String(right.createdAt || "").localeCompare(
+          String(left.createdAt || ""),
+        ),
+      )
+      .slice(0, 2000);
+    movementsRef.current = sorted;
+    setInventoryMovements(sorted);
+    return sorted;
+  }, []);
+
   useEffect(() => {
     productsRef.current = products;
   }, [products]);
+
+  useEffect(() => {
+    movementsRef.current = inventoryMovements;
+    if (!firebaseConfigured)
+      writeStorage(MOVEMENT_STORAGE_KEY, inventoryMovements);
+  }, [inventoryMovements]);
 
   useEffect(() => {
     if (!firebaseConfigured || !firestore) return undefined;
@@ -137,8 +182,49 @@ export function ProductProvider({ children }) {
   }, [commitProducts]);
 
   useEffect(() => {
+    if (
+      !firebaseConfigured ||
+      !firestore ||
+      !user ||
+      !["staff", "owner"].includes(role)
+    )
+      return undefined;
+    return onSnapshot(
+      collection(firestore, "inventoryMovements"),
+      (snapshot) =>
+        commitMovements(
+          snapshot.docs.map((item) =>
+            normalizeMovement({ id: item.id, ...item.data() }),
+          ),
+        ),
+      () => commitMovements([]),
+    );
+  }, [commitMovements, role, user]);
+
+  useEffect(() => {
     if (!firebaseConfigured) writeStorage(STORAGE_KEY, products);
   }, [products]);
+
+  const inventoryEntry = useCallback(
+    ({ product, type, quantity, beforeStock, afterStock, reason, order }) => ({
+      id: createId("movement"),
+      productId: product.id,
+      productName: product.name,
+      supplier: product.supplier,
+      type,
+      quantity,
+      beforeStock,
+      afterStock,
+      orderId: order?.id || "",
+      orderNumber: order?.number || "",
+      reason: String(reason || "Stock adjustment").trim().slice(0, 300),
+      actorId: String(user?.id || role).slice(0, 160),
+      actorName: String(user?.name || role).slice(0, 120),
+      actorRole: role,
+      createdAt: new Date().toISOString(),
+    }),
+    [role, user],
+  );
 
   const updateProduct = useCallback(
     async (id, changes) => {
@@ -161,10 +247,46 @@ export function ProductProvider({ children }) {
       if (validationError) return { ok: false, error: validationError };
       const next = formatProduct(candidate);
       if (next.stock === 0) next.available = false;
+      const stockChanged = next.stock !== current.stock;
+      const movement = stockChanged
+        ? inventoryEntry({
+            product: next,
+            type: "manual_adjustment",
+            quantity: next.stock - current.stock,
+            beforeStock: current.stock,
+            afterStock: next.stock,
+            reason: "Product stock edited by owner",
+          })
+        : null;
 
       if (firebaseConfigured && firestore) {
         try {
-          await updateDoc(doc(firestore, "products", id), next);
+          await runTransaction(firestore, async (transaction) => {
+            transaction.update(doc(firestore, "products", id), next);
+            if (movement)
+              transaction.set(
+                doc(firestore, "inventoryMovements", movement.id),
+                movement,
+              );
+          });
+          const action =
+            current.archived !== next.archived
+              ? next.archived
+                ? "archive_product"
+                : "restore_product"
+              : current.price !== next.price
+                ? "update_price"
+                : stockChanged
+                  ? "adjust_stock"
+                  : "update_product";
+          await logActivity({
+            action,
+            entityType: "product",
+            entityId: id,
+            summary: stockChanged
+              ? `Adjusted ${next.name} stock from ${current.stock} to ${next.stock}.`
+              : `Updated ${next.name}.`,
+          });
           return { ok: true, product: next };
         } catch (error) {
           return { ok: false, error: productError(error, "Unable to update this product.") };
@@ -174,9 +296,28 @@ export function ProductProvider({ children }) {
       commitProducts((items) =>
         items.map((product) => (product.id === id ? next : product)),
       );
+      if (movement) commitMovements((items) => [movement, ...items]);
+      const action =
+        current.archived !== next.archived
+          ? next.archived
+            ? "archive_product"
+            : "restore_product"
+          : current.price !== next.price
+            ? "update_price"
+            : stockChanged
+              ? "adjust_stock"
+              : "update_product";
+      await logActivity({
+        action,
+        entityType: "product",
+        entityId: id,
+        summary: stockChanged
+          ? `Adjusted ${next.name} stock from ${current.stock} to ${next.stock}.`
+          : `Updated ${next.name}.`,
+      });
       return { ok: true, product: next };
     },
-    [commitProducts],
+    [commitMovements, commitProducts, inventoryEntry, logActivity],
   );
 
   const addProduct = useCallback(
@@ -214,6 +355,12 @@ export function ProductProvider({ children }) {
               throw new Error("That Product ID is already in use.");
             transaction.set(productRef, product);
           });
+          await logActivity({
+            action: "add_product",
+            entityType: "product",
+            entityId: product.id,
+            summary: `Added product ${product.name}.`,
+          });
           return { ok: true, product };
         } catch (error) {
           return {
@@ -227,9 +374,92 @@ export function ProductProvider({ children }) {
       }
 
       commitProducts((items) => [...items, product]);
+      await logActivity({
+        action: "add_product",
+        entityType: "product",
+        entityId: product.id,
+        summary: `Added product ${product.name}.`,
+      });
       return { ok: true, product };
     },
-    [commitProducts],
+    [commitProducts, logActivity],
+  );
+
+  const restockProduct = useCallback(
+    async (id, amount, reason = "New finished-product stock received") => {
+      const current = productsRef.current.find((product) => product.id === id);
+      const quantity = Number(amount);
+      if (
+        !current ||
+        !Number.isSafeInteger(quantity) ||
+        quantity < 1 ||
+        quantity > 100000 ||
+        !Number.isSafeInteger(current.stock + quantity)
+      )
+        return { ok: false, error: "Enter a restock quantity from 1 to 100,000." };
+      const movement = inventoryEntry({
+        product: current,
+        type: "restock",
+        quantity,
+        beforeStock: current.stock,
+        afterStock: current.stock + quantity,
+        reason,
+      });
+      const next = formatProduct({
+        ...current,
+        stock: current.stock + quantity,
+        available: current.stock === 0 ? true : current.available,
+        updatedAt: movement.createdAt,
+      });
+      if (firebaseConfigured && firestore) {
+        try {
+          await runTransaction(firestore, async (transaction) => {
+            const productRef = doc(firestore, "products", id);
+            const snapshot = await transaction.get(productRef);
+            if (!snapshot.exists()) throw new Error("Product not found.");
+            const live = snapshot.data();
+            const beforeStock = Number(live.stock || 0);
+            const afterStock = beforeStock + quantity;
+            const liveMovement = {
+              ...movement,
+              beforeStock,
+              afterStock,
+              createdAt: new Date().toISOString(),
+            };
+            transaction.update(productRef, {
+              stock: afterStock,
+              available: beforeStock === 0 ? true : live.available !== false,
+              updatedAt: liveMovement.createdAt,
+            });
+            transaction.set(
+              doc(firestore, "inventoryMovements", liveMovement.id),
+              liveMovement,
+            );
+          });
+          await logActivity({
+            action: "restock_product",
+            entityType: "inventory",
+            entityId: id,
+            summary: `Added ${quantity} units to ${current.name}.`,
+          });
+          return { ok: true, product: next };
+        } catch (error) {
+          return { ok: false, error: productError(error, "Unable to restock this product.") };
+        }
+      }
+      commitProducts((items) =>
+        items.map((product) => (product.id === id ? next : product)),
+      );
+      commitMovements((items) => [movement, ...items]);
+      await logActivity({
+        action: "restock_product",
+        entityType: "inventory",
+        entityId: id,
+        summary: `Added ${quantity} units to ${current.name}.`,
+      });
+      return { ok: true, product: next };
+    },
+    [commitMovements, commitProducts, inventoryEntry, logActivity],
   );
 
   const archiveProduct = useCallback(
@@ -275,7 +505,7 @@ export function ProductProvider({ children }) {
   }, []);
 
   const deductInventory = useCallback(
-    (items) => {
+    (items, order = null) => {
       if (firebaseConfigured)
         return {
           ok: false,
@@ -298,11 +528,23 @@ export function ProductProvider({ children }) {
             "A product no longer has enough finished-product stock to complete this order.",
         };
       const timestamp = new Date().toISOString();
+      const movements = [];
       commitProducts((current) =>
         current.map((product) => {
           const quantity = summary.quantities.get(product.id) || 0;
           if (!quantity) return product;
           const stock = product.stock - quantity;
+          movements.push(
+            inventoryEntry({
+              product,
+              type: "order_deduction",
+              quantity: -quantity,
+              beforeStock: product.stock,
+              afterStock: stock,
+              reason: `Completed order ${order?.number || ""}`.trim(),
+              order,
+            }),
+          );
           return {
             ...product,
             stock,
@@ -311,17 +553,21 @@ export function ProductProvider({ children }) {
           };
         }),
       );
+      if (movements.length)
+        commitMovements((current) => [...movements, ...current]);
       return { ok: true, deductedAt: timestamp };
     },
-    [commitProducts],
+    [commitMovements, commitProducts, inventoryEntry],
   );
 
   const value = useMemo(
     () => ({
       products,
+      inventoryMovements,
       lowStockLimit: LOW_STOCK_LIMIT,
       usingFirebase: firebaseConfigured,
       updateProduct,
+      restockProduct,
       addProduct,
       archiveProduct,
       restoreProduct,
@@ -335,7 +581,9 @@ export function ProductProvider({ children }) {
       products,
       restoreProduct,
       updateProduct,
+      restockProduct,
       validateOrderItems,
+      inventoryMovements,
     ],
   );
   return (

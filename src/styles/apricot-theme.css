@@ -229,3 +229,426 @@ textarea {
     -webkit-backdrop-filter: none;
   }
 }
+
+/* Operations additions: notifications, schedules, receipts, and audit trails. */
+.workspace-topbar-actions,
+.workspace-topbar-actions > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notification-center {
+  position: relative;
+  z-index: 30;
+}
+
+.notification-trigger {
+  position: relative;
+}
+
+.notification-count {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  place-items: center;
+  border: 2px solid var(--surface-color);
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.notification-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: min(380px, calc(100vw - 28px));
+  max-height: min(560px, calc(100vh - 90px));
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--surface-color);
+  box-shadow: 0 20px 55px rgb(var(--shadow-color) / 0.28);
+  color: var(--text-color);
+  backdrop-filter: blur(22px) saturate(1.1);
+}
+
+.notification-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.notification-panel > header > div,
+.notification-list a > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.notification-panel small,
+.notification-list small {
+  color: var(--muted-text-color);
+  font-size: 10px;
+}
+
+.notification-list {
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.notification-list a {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+  text-decoration: none;
+}
+
+.notification-list a.unread {
+  background: color-mix(in srgb, var(--primary-orange) 10%, transparent);
+}
+
+.notification-list a:hover,
+.notification-list a:focus-visible {
+  background: var(--surface-alt);
+}
+
+.notification-icon,
+.activity-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary-orange-soft);
+  color: var(--primary-orange-hover);
+}
+
+.notification-empty {
+  margin: 0;
+  padding: 30px 18px;
+  color: var(--muted-text-color);
+  text-align: center;
+}
+
+.fulfillment-timing,
+.gcash-details-form {
+  display: grid;
+  gap: 13px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-color);
+}
+
+.timing-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.timing-heading small,
+.schedule-field small {
+  color: var(--muted-text-color);
+}
+
+.schedule-field {
+  max-width: 360px;
+}
+
+.scheduled-order-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--surface-alt);
+  color: var(--text-color);
+  font-size: 11px;
+}
+
+.gcash-customer-form {
+  display: grid;
+  gap: 14px;
+}
+
+.payment-reference-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.payment-reference-details div {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--surface-color);
+}
+
+.payment-reference-details dt {
+  color: var(--muted-text-color);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.payment-reference-details dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.order-timeline li span,
+.status-history-card li span {
+  display: grid;
+  gap: 2px;
+}
+
+.order-timeline li small,
+.status-history-card li small {
+  color: var(--muted-text-color);
+  font-size: 9px;
+}
+
+.status-history-card {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.status-history-card h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.status-history-card ol {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status-history-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.status-history-card svg {
+  flex: none;
+  color: var(--primary-orange);
+}
+
+.movement-positive {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.movement-negative {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.checkbox-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--surface-alt);
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--primary-orange);
+}
+
+.checkbox-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.checkbox-row small {
+  color: var(--muted-text-color);
+}
+
+.activity-list {
+  display: grid;
+}
+
+.activity-list article {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 2px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.activity-list article > div {
+  display: grid;
+  gap: 4px;
+}
+
+.activity-list article small {
+  color: var(--muted-text-color);
+  font-size: 10px;
+}
+
+.receipt-modal {
+  width: min(680px, calc(100vw - 28px));
+}
+
+.order-receipt {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-color);
+}
+
+.order-receipt > header,
+.receipt-totals span,
+.receipt-totals > strong,
+.receipt-items > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.order-receipt h2 {
+  margin: 3px 0 0;
+}
+
+.receipt-meta,
+.order-receipt > section,
+.order-receipt footer {
+  display: grid;
+  gap: 4px;
+  color: var(--muted-text-color);
+  font-size: 11px;
+}
+
+.receipt-items,
+.receipt-totals {
+  display: grid;
+  gap: 10px;
+  padding-block: 14px;
+  border-block: 1px solid var(--border-color);
+}
+
+.receipt-items small {
+  display: block;
+  color: var(--muted-text-color);
+}
+
+.receipt-totals > strong {
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  font-size: 16px;
+}
+
+.receipt-print-button {
+  margin-top: 16px;
+}
+
+.order-receipt-button {
+  width: 100%;
+  margin: 4px 0 16px;
+}
+
+@media (max-width: 680px) {
+  .workspace-topbar-actions > span {
+    display: none;
+  }
+
+  .notification-panel {
+    position: fixed;
+    top: 66px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .timing-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .payment-reference-details {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-list article {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .activity-list article > .period-label {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .order-receipt {
+    padding: 14px;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .receipt-modal,
+  .receipt-modal * {
+    visibility: visible !important;
+  }
+
+  .receipt-modal {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: #fff;
+    color: #111;
+  }
+
+  .receipt-modal > header,
+  .receipt-print-button {
+    display: none !important;
+  }
+
+  .order-receipt {
+    border: 0;
+    background: #fff;
+    color: #111;
+  }
+}

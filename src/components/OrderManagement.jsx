@@ -12,17 +12,19 @@ import OrderStatusBadge from "./OrderStatusBadge";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 import Modal from "./Modal";
 import Icon from "./Icon";
+import OrderReceipt from "./OrderReceipt";
 import { peso, prettyDate } from "../utils/formatters";
 export default function OrderManagement({ role = "owner" }) {
   const { orders, updateOrderStatus, updatePaymentStatus } = useOrders();
   const { products } = useProducts();
-  const { notify } = useShop();
+  const { notify, settings } = useShop();
   const { params, navigate } = useHashRoute();
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [updating, setUpdating] = useState(false);
   const [paymentUpdating, setPaymentUpdating] = useState(false);
+  const [receiptOrder, setReceiptOrder] = useState(null);
   const visible = orders.filter(
     (o) =>
       (filter === "All" || o.status === filter) &&
@@ -168,6 +170,11 @@ export default function OrderManagement({ role = "owner" }) {
             <OrderStatusBadge status={current.status} />
           </div>
           <p className="order-modal-date">{prettyDate(current.createdAt)}</p>
+          {current.scheduledFor && (
+            <p className="scheduled-order-note">
+              <Icon name="calendar" size={18} /> Scheduled for {prettyDate(current.scheduledFor)}
+            </p>
+          )}
           {params.source === "pickup" && current.orderType === "pickup" && (
             <p className="pickup-scan-note" role="status">
               <Icon name="completed" size={18} weight="fill" />
@@ -220,6 +227,27 @@ export default function OrderManagement({ role = "owner" }) {
                   Match the order total with the GCash transaction before
                   marking this payment as verified.
                 </p>
+                <dl className="payment-reference-details">
+                  <div>
+                    <dt>Reference</dt>
+                    <dd>{current.gcashReference || "Not submitted"}</dd>
+                  </div>
+                  <div>
+                    <dt>Sender</dt>
+                    <dd>{current.gcashSenderName || "Not submitted"}</dd>
+                  </div>
+                  <div>
+                    <dt>Paid</dt>
+                    <dd>
+                      {current.gcashPaidAt
+                        ? prettyDate(current.gcashPaidAt)
+                        : "Not submitted"}
+                    </dd>
+                  </div>
+                </dl>
+                {current.gcashPaymentNote && (
+                  <small>Customer note: {current.gcashPaymentNote}</small>
+                )}
                 {current.paymentVerifiedAt && (
                   <small>
                     Verified {prettyDate(current.paymentVerifiedAt)}
@@ -249,6 +277,33 @@ export default function OrderManagement({ role = "owner" }) {
               </button>
             </section>
           )}
+          <section className="status-history-card">
+            <h3>Status history</h3>
+            <ol>
+              {(current.statusHistory || []).map((entry, index) => (
+                <li key={`${entry.status}-${entry.at}-${index}`}>
+                  <Icon name="completed" size={17} weight="fill" />
+                  <span>
+                    <strong>{entry.status}</strong>
+                    <small>
+                      {prettyDate(entry.at)}
+                      {entry.actorName ? ` · ${entry.actorName}` : ""}
+                    </small>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <button
+            type="button"
+            className="btn-secondary order-receipt-button"
+            onClick={() => {
+              setReceiptOrder(current);
+              close();
+            }}
+          >
+            <Icon name="receipt" size={17} /> View printable receipt
+          </button>
           <label>
             Status
             <select
@@ -296,6 +351,13 @@ export default function OrderManagement({ role = "owner" }) {
             </button>
           )}
         </Modal>
+      )}
+      {receiptOrder && (
+        <OrderReceipt
+          order={receiptOrder}
+          settings={settings}
+          onClose={() => setReceiptOrder(null)}
+        />
       )}
     </DashboardLayout>
   );

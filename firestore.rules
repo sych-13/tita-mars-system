@@ -91,7 +91,10 @@ service cloud.firestore {
           'deliveryArea', 'notes', 'orderType', 'payment', 'subtotal',
           'deliveryFee', 'total', 'items', 'number', 'status', 'createdAt',
           'updatedAt', 'inventoryDeductedAt', 'paymentStatus',
-          'paymentVerifiedAt', 'paymentVerifiedBy'
+          'paymentVerifiedAt', 'paymentVerifiedBy', 'gcashReference',
+          'gcashSenderName', 'gcashPaidAt', 'gcashPaymentNote',
+          'paymentSubmittedAt', 'fulfillmentTiming', 'scheduledFor',
+          'statusHistory'
         ]) &&
         request.resource.data.id == orderId &&
         request.resource.data.customerId == request.auth.uid &&
@@ -111,6 +114,36 @@ service cloud.firestore {
             request.resource.data.paymentStatus == 'Pending Verification')) &&
         request.resource.data.paymentVerifiedAt == null &&
         request.resource.data.paymentVerifiedBy == null &&
+        request.resource.data.gcashReference is string &&
+        request.resource.data.gcashSenderName is string &&
+        request.resource.data.gcashPaymentNote is string &&
+        (request.resource.data.gcashPaidAt == null ||
+          request.resource.data.gcashPaidAt is string) &&
+        (request.resource.data.paymentSubmittedAt == null ||
+          request.resource.data.paymentSubmittedAt is string) &&
+        ((request.resource.data.payment == 'cash' &&
+            request.resource.data.gcashReference == '' &&
+            request.resource.data.gcashSenderName == '' &&
+            request.resource.data.gcashPaidAt == null &&
+            request.resource.data.gcashPaymentNote == '' &&
+            request.resource.data.paymentSubmittedAt == null) ||
+          (request.resource.data.payment == 'gcash' &&
+            ((request.resource.data.gcashReference == '' &&
+                request.resource.data.gcashSenderName == '' &&
+                request.resource.data.gcashPaidAt == null &&
+                request.resource.data.gcashPaymentNote == '' &&
+                request.resource.data.paymentSubmittedAt == null) ||
+              (request.resource.data.gcashReference.matches('^[0-9]{8,20}$') &&
+                request.resource.data.gcashSenderName.size() > 0 &&
+                request.resource.data.gcashSenderName.size() <= 120 &&
+                request.resource.data.gcashPaidAt is string &&
+                request.resource.data.gcashPaymentNote.size() <= 300 &&
+                request.resource.data.paymentSubmittedAt is string)))) &&
+        request.resource.data.fulfillmentTiming in ['asap', 'scheduled'] &&
+        ((request.resource.data.fulfillmentTiming == 'asap' &&
+            request.resource.data.scheduledFor == null) ||
+          (request.resource.data.fulfillmentTiming == 'scheduled' &&
+            request.resource.data.scheduledFor is string)) &&
         request.resource.data.subtotal is number &&
         request.resource.data.deliveryFee is number &&
         request.resource.data.total is number &&
@@ -128,6 +161,11 @@ service cloud.firestore {
         request.resource.data.items.size() <= 50 &&
         request.resource.data.number is string &&
         request.resource.data.status == 'Pending' &&
+        request.resource.data.statusHistory is list &&
+        request.resource.data.statusHistory.size() == 1 &&
+        request.resource.data.statusHistory[0].status == 'Pending' &&
+        request.resource.data.statusHistory[0].at is string &&
+        request.resource.data.statusHistory[0].actorId == request.auth.uid &&
         request.resource.data.createdAt is string &&
         request.resource.data.updatedAt is string &&
         request.resource.data.inventoryDeductedAt == null;
@@ -166,7 +204,8 @@ service cloud.firestore {
     function validStoreSettings() {
       return request.resource.data.keys().hasOnly([
           'name', 'phone', 'email', 'address', 'hours', 'deliveryFee',
-          'gcashName', 'gcashNumber'
+          'gcashName', 'gcashNumber', 'orderingEnabled', 'openingTime',
+          'closingTime', 'allowScheduledOrders', 'maxScheduleDays'
         ]) &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 0 &&
@@ -179,7 +218,67 @@ service cloud.firestore {
         request.resource.data.deliveryFee is int &&
         request.resource.data.deliveryFee >= 0 &&
         request.resource.data.gcashName is string &&
-        request.resource.data.gcashNumber is string;
+        request.resource.data.gcashNumber is string &&
+        request.resource.data.orderingEnabled is bool &&
+        request.resource.data.openingTime is string &&
+        request.resource.data.openingTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+        request.resource.data.closingTime is string &&
+        request.resource.data.closingTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+        request.resource.data.allowScheduledOrders is bool &&
+        request.resource.data.maxScheduleDays is int &&
+        request.resource.data.maxScheduleDays >= 1 &&
+        request.resource.data.maxScheduleDays <= 30;
+    }
+
+    function validInventoryMovement() {
+      return request.resource.data.keys().hasOnly([
+          'id', 'productId', 'productName', 'supplier', 'type', 'quantity',
+          'beforeStock', 'afterStock', 'orderId', 'orderNumber', 'reason',
+          'actorId', 'actorName', 'actorRole', 'createdAt'
+        ]) &&
+        request.resource.data.id is string &&
+        request.resource.data.productId is string &&
+        request.resource.data.productName is string &&
+        request.resource.data.supplier is string &&
+        request.resource.data.type in [
+          'restock', 'manual_adjustment', 'order_deduction'
+        ] &&
+        request.resource.data.quantity is int &&
+        request.resource.data.quantity != 0 &&
+        request.resource.data.beforeStock is int &&
+        request.resource.data.beforeStock >= 0 &&
+        request.resource.data.afterStock is int &&
+        request.resource.data.afterStock >= 0 &&
+        request.resource.data.afterStock ==
+          request.resource.data.beforeStock + request.resource.data.quantity &&
+        request.resource.data.orderId is string &&
+        request.resource.data.orderNumber is string &&
+        request.resource.data.reason is string &&
+        request.resource.data.reason.size() <= 300 &&
+        request.resource.data.actorId == request.auth.uid &&
+        request.resource.data.actorName is string &&
+        request.resource.data.actorRole in ['staff', 'owner'] &&
+        request.resource.data.createdAt is string;
+    }
+
+    function validAuditLog() {
+      return request.resource.data.keys().hasOnly([
+          'id', 'action', 'entityType', 'entityId', 'summary', 'actorId',
+          'actorName', 'actorRole', 'createdAt'
+        ]) &&
+        request.resource.data.id is string &&
+        request.resource.data.action is string &&
+        request.resource.data.action.size() <= 80 &&
+        request.resource.data.entityType is string &&
+        request.resource.data.entityType.size() <= 80 &&
+        request.resource.data.entityId is string &&
+        request.resource.data.entityId.size() <= 160 &&
+        request.resource.data.summary is string &&
+        request.resource.data.summary.size() <= 500 &&
+        request.resource.data.actorId == request.auth.uid &&
+        request.resource.data.actorName is string &&
+        request.resource.data.actorRole in ['staff', 'owner'] &&
+        request.resource.data.createdAt is string;
     }
 
     function validProfile() {
@@ -251,8 +350,13 @@ service cloud.firestore {
       allow update: if
         (isStaff() &&
           ((request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'updatedAt', 'inventoryDeductedAt']) &&
+              .hasOnly([
+                'status', 'updatedAt', 'inventoryDeductedAt', 'statusHistory'
+              ]) &&
             request.resource.data.updatedAt is string &&
+            request.resource.data.statusHistory is list &&
+            request.resource.data.statusHistory.size() >=
+              resource.data.get('statusHistory', []).size() &&
             validStatusForOrder() &&
             validStatusTransition() &&
             validInventoryMarker()) ||
@@ -263,6 +367,24 @@ service cloud.firestore {
               ]) &&
             request.resource.data.updatedAt is string &&
             validPaymentUpdate()))) ||
+        (isOwnOrder() &&
+          resource.data.payment == 'gcash' &&
+          resource.data.paymentStatus == 'Pending Verification' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'gcashReference', 'gcashSenderName', 'gcashPaidAt',
+              'gcashPaymentNote', 'paymentSubmittedAt', 'updatedAt'
+            ]) &&
+          request.resource.data.gcashReference is string &&
+          request.resource.data.gcashReference.matches('^[0-9]{8,20}$') &&
+          request.resource.data.gcashSenderName is string &&
+          request.resource.data.gcashSenderName.size() > 0 &&
+          request.resource.data.gcashSenderName.size() <= 120 &&
+          request.resource.data.gcashPaidAt is string &&
+          request.resource.data.gcashPaymentNote is string &&
+          request.resource.data.gcashPaymentNote.size() <= 300 &&
+          request.resource.data.paymentSubmittedAt is string &&
+          request.resource.data.updatedAt is string) ||
         (isOwnOrder() &&
           resource.data.status == 'Completed' &&
           !resource.data.keys().hasAny(['review']) &&
@@ -280,6 +402,20 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isOwner() && settingId == 'store' && validStoreSettings();
+    }
+
+    match /inventoryMovements/{movementId} {
+      allow read: if isStaff();
+      allow create: if isStaff() &&
+        request.resource.data.id == movementId && validInventoryMovement();
+      allow update, delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isStaff();
+      allow create: if isStaff() &&
+        request.resource.data.id == logId && validAuditLog();
+      allow update, delete: if false;
     }
   }
 }

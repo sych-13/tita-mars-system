@@ -13,6 +13,7 @@ import { writeStorage } from "../utils/storage";
 import { createStaffAuthUser, firestore } from "../lib/firebase";
 import { useShop } from "../context/ShopContext";
 import { useSession } from "../context/SessionContext";
+import { useActivity } from "../context/ActivityContext";
 import DashboardLayout from "../layouts/DashboardLayout";
 import Icon from "./Icon";
 import Modal from "./Modal";
@@ -24,6 +25,7 @@ export default function StaffManagement() {
   const [error, setError] = useState("");
   const { notify } = useShop();
   const { usingFirebase, user } = useSession();
+  const { logActivity } = useActivity();
   useEffect(() => {
     if (!usingFirebase || !firestore) {
       setAccounts(getAccounts());
@@ -117,6 +119,12 @@ export default function StaffManagement() {
     } else result = await saveAccount({ ...draft, role: "staff" }, draft.id);
     setBusy(false);
     if (result.ok) {
+      await logActivity({
+        action: draft.id ? "update_staff" : "create_staff",
+        entityType: "staff",
+        entityId: draft.id || draft.email,
+        summary: `${draft.id ? "Updated" : "Created"} staff account for ${draft.name.trim()}.`,
+      });
       if (!usingFirebase) setAccounts(getAccounts());
       setDraft(null);
       notify("Staff account saved.");
@@ -134,6 +142,12 @@ export default function StaffManagement() {
             ? "Staff account deactivated."
             : "Staff account restored.",
         );
+        await logActivity({
+          action: account.active ? "deactivate_staff" : "restore_staff",
+          entityType: "staff",
+          entityId: account.id,
+          summary: `${account.active ? "Deactivated" : "Restored"} staff account for ${account.name}.`,
+        });
       } catch {
         notify("Unable to update this staff account.");
       }
@@ -147,6 +161,12 @@ export default function StaffManagement() {
     notify(
       account.active ? "Staff account deactivated." : "Staff account restored.",
     );
+    await logActivity({
+      action: account.active ? "deactivate_staff" : "restore_staff",
+      entityType: "staff",
+      entityId: account.id,
+      summary: `${account.active ? "Deactivated" : "Restored"} staff account for ${account.name}.`,
+    });
   };
   return (
     <DashboardLayout role="Owner / Admin">

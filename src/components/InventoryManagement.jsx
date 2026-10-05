@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useProducts } from "../context/ProductContext";
 import { useOrders } from "../context/OrdersContext";
@@ -6,15 +6,22 @@ import { useShop } from "../context/ShopContext";
 import { prettyDate } from "../utils/formatters";
 import Icon from "./Icon";
 import Modal from "./Modal";
+import { useHashRoute } from "../hooks/useHashRoute";
 
 export default function InventoryManagement({ role = "owner" }) {
-  const { products, lowStockLimit, updateProduct } = useProducts();
+  const { products, lowStockLimit, inventoryMovements, restockProduct } =
+    useProducts();
   const { orders } = useOrders();
   const { notify } = useShop();
+  const { params } = useHashRoute();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
   const [quantity, setQuantity] = useState(5);
+  const [reason, setReason] = useState("New finished-product stock received");
+  useEffect(() => {
+    if (params.product) setQuery(params.product);
+  }, [params.product]);
   const active = products.filter((product) => !product.archived);
   const stateFor = (product) =>
     product.stock === 0
@@ -37,21 +44,27 @@ export default function InventoryManagement({ role = "owner" }) {
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const history = orders
+  const legacyHistory = orders
     .filter((order) => order.inventoryDeductedAt)
-    .sort(
-      (a, b) =>
-        new Date(b.inventoryDeductedAt) - new Date(a.inventoryDeductedAt),
-    )
     .flatMap((order) =>
       order.items.map((item, index) => ({
-        ...item,
-        key: order.id + "-" + item.id + "-" + index,
-        order: order.number,
-        at: order.inventoryDeductedAt,
+        id: `legacy-${order.id}-${item.id}-${index}`,
+        productName: item.name,
+        supplier: item.supplier,
+        type: "order_deduction",
+        quantity: -item.quantity,
+        beforeStock: null,
+        afterStock: null,
+        orderNumber: order.number,
+        reason: `Completed order ${order.number}`,
+        actorName: "System",
+        createdAt: order.inventoryDeductedAt,
       })),
-    )
-    .slice(0, 8);
+    );
+  const history = (inventoryMovements.length
+    ? inventoryMovements
+    : legacyHistory
+  ).slice(0, 30);
   const current = products.find((product) => product.id === selected);
   const restock = async (event) => {
     event.preventDefault();
@@ -66,10 +79,7 @@ export default function InventoryManagement({ role = "owner" }) {
       notify("Enter a restock quantity from 1 to 100,000.");
       return;
     }
-    const result = await updateProduct(current.id, (product) => ({
-      stock: product.stock + amount,
-      available: product.stock === 0 ? true : product.available,
-    }));
+    const result = await restockProduct(current.id, amount, reason);
     notify(result.ok ? amount + " units added to " + current.name + "." : result.error);
     if (result.ok) setSelected(null);
   };
@@ -202,6 +212,7 @@ export default function InventoryManagement({ role = "owner" }) {
                       onClick={() => {
                         setSelected(product.id);
                         setQuantity(5);
+                        setReason("New finished-product stock received");
                       }}
                       aria-label={
                         "Restock " +
@@ -232,8 +243,8 @@ export default function InventoryManagement({ role = "owner" }) {
       </section>
       <section className="simple-card inventory-ledger">
         <header className="table-toolbar">
-          <h2>Order Stock Deductions</h2>
-          <span className="period-label">Most recent completed orders</span>
+          <h2>Inventory Movement History</h2>
+          <span className="period-label">Restocks, adjustments, and deductions</span>
         </header>
         {history.length ? (
           <div
@@ -247,19 +258,36 @@ export default function InventoryManagement({ role = "owner" }) {
                 <tr>
                   <th>Product</th>
                   <th>Supplier</th>
-                  <th>Order</th>
+                  <th>Reason</th>
                   <th>Change</th>
-                  <th>Completed</th>
+                  <th>Balance</th>
+                  <th>Recorded by</th>
+                  <th>Date</th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((entry) => (
-                  <tr key={entry.key}>
-                    <td>{entry.name}</td>
+                  <tr key={entry.id}>
+                    <td>{entry.productName}</td>
                     <td>{entry.supplier}</td>
-                    <td>{entry.order}</td>
-                    <td>−{entry.quantity}</td>
-                    <td>{prettyDate(entry.at)}</td>
+                    <td>{entry.reason || entry.orderNumber || "Stock adjustment"}</td>
+                    <td
+                      className={
+                        entry.quantity > 0
+                          ? "movement-positive"
+                          : "movement-negative"
+                      }
+                    >
+                      {entry.quantity > 0 ? "+" : ""}
+                      {entry.quantity}
+                    </td>
+                    <td>
+                      {entry.afterStock === null
+                        ? "Legacy record"
+                        : `${entry.beforeStock} → ${entry.afterStock}`}
+                    </td>
+                    <td>{entry.actorName || "System"}</td>
+                    <td>{prettyDate(entry.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -268,7 +296,7 @@ export default function InventoryManagement({ role = "owner" }) {
         ) : (
           <div className="dashboard-empty">
             <Icon name="inventory" size={32} />
-            <p>Stock deductions will appear after the first completed order.</p>
+            <p>Inventory changes will appear after a restock or completed order.</p>
           </div>
         )}
       </section>
@@ -295,6 +323,16 @@ export default function InventoryManagement({ role = "owner" }) {
                 required
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}
+              />
+            </label>
+            <label>
+              Reason
+              <input
+                value={reason}
+                maxLength="300"
+                required
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="Example: Supplier delivery received"
               />
             </label>
             <p className="table-footer">

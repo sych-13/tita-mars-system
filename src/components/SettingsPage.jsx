@@ -3,6 +3,7 @@ import { useShop } from "../context/ShopContext";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ThemeToggle from "./ThemeToggle";
 import Icon from "./Icon";
+import { storeHoursLabel } from "../utils/businessHours";
 export default function SettingsPage() {
   const { settings, saveSettings, notify } = useShop();
   const [draft, setDraft] = useState(settings);
@@ -51,6 +52,83 @@ export default function SettingsPage() {
               </label>
             ))}
           </div>
+        </section>
+        <section className="simple-card settings-ordering-card">
+          <h2>
+            <Icon name="clock" />
+            Ordering schedule
+          </h2>
+          <p>
+            Control when customers may place ASAP orders and how far ahead they
+            can schedule. Current window: {storeHoursLabel(draft)}.
+          </p>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.orderingEnabled !== false}
+              onChange={(event) =>
+                setDraft({ ...draft, orderingEnabled: event.target.checked })
+              }
+            />
+            <span>
+              <strong>Accept online orders</strong>
+              <small>Turn this off to pause both pickup and delivery checkout.</small>
+            </span>
+          </label>
+          <div className="form-grid two-column">
+            <label>
+              Opening time
+              <input
+                type="time"
+                required
+                value={draft.openingTime || "06:00"}
+                onChange={(event) =>
+                  setDraft({ ...draft, openingTime: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Closing time
+              <input
+                type="time"
+                required
+                value={draft.closingTime || "21:00"}
+                onChange={(event) =>
+                  setDraft({ ...draft, closingTime: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.allowScheduledOrders !== false}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  allowScheduledOrders: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>Allow scheduled orders</strong>
+              <small>Customers can select a future pickup or delivery time.</small>
+            </span>
+          </label>
+          <label>
+            Maximum advance booking (days)
+            <input
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              required
+              value={draft.maxScheduleDays ?? 7}
+              onChange={(event) =>
+                setDraft({ ...draft, maxScheduleDays: event.target.value })
+              }
+            />
+          </label>
         </section>
         <section className="simple-card">
           <h2>

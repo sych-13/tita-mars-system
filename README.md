@@ -27,8 +27,12 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 
 - Customer storefront, supplier-filtered catalog, search, favorites, product details and persistent cart.
 - Pickup or Taytay/Cainta delivery, Cash or manual GCash QR payment, staff/owner payment verification, checkout, confirmation, order tracking and completed-order reviews.
+- Customers can record their GCash reference number, sender name and payment time during checkout or later from My Orders; staff can review those details before verification.
+- ASAP and scheduled pickup/delivery ordering follows the owner-configured opening time, closing time, booking window and ordering pause control.
+- A real-time in-app notification center surfaces new orders, GCash payments, order updates, and low/out-of-stock products.
+- Printable order receipts can be opened by customers and staff/owners and saved as PDF through the browser print dialog.
 - A unique pickup-verification QR is shown when a pickup order reaches **Ready for Pickup**. Scanning it opens that order in the protected staff/owner workspace.
-- Owner workspace: dashboard, product editor, archive/restore, inventory, preset or custom-date sales reports, filtered CSV export, staff management and settings.
+- Owner workspace: dashboard, product editor, archive/restore, inventory movement ledger, low-stock alerts, detailed audit log, preset or custom-date sales reports, filtered CSV export, staff management and settings.
 - Staff workspace: order queue, status updates, finished-product restocking, inventory monitoring and daily sales report.
 - Firebase email/password login, customer registration, password-reset emails, and protected role-based workspaces.
 - Store location preview and one-click Google Maps directions based on the address in Settings.
@@ -39,17 +43,17 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 
 The seed catalog contains the exact 22 approved products with unchanged names, prices and suppliers. Both Banana Loaf products remain separate: Ribbonette's is PHP 170 and Gabbis is PHP 160. Initial stock is 20 per product.
 
-Finished products only are tracked. Pickup orders move through Pending → Confirmed → Preparing → Ready for Pickup → Completed; delivery orders use Out for Delivery instead. Stock is deducted atomically and only once when an order becomes Completed. Earlier statuses do not deduct stock, while Completed and Cancelled orders are locked. Archived, unavailable and out-of-stock products cannot be ordered.
+Finished products only are tracked. Every restock, manual stock adjustment and completed-order deduction creates an inventory movement record with before/after quantity, reason, actor and timestamp. Pickup orders move through Pending → Confirmed → Preparing → Ready for Pickup → Completed; delivery orders use Out for Delivery instead. Every status change records its actor and timestamp. Stock is deducted atomically and only once when an order becomes Completed. Earlier statuses do not deduct stock, while Completed and Cancelled orders are locked. Archived, unavailable and out-of-stock products cannot be ordered.
 
 ## Firebase data mode
 
-The app is prepared for Firebase Authentication and Cloud Firestore. When the six `VITE_FIREBASE_*` variables are configured, customer accounts, profiles, products, orders, reviews, order status and completed-order inventory deductions are stored in Firebase and update connected screens in real time.
+The app is prepared for Firebase Authentication and Cloud Firestore. When the six `VITE_FIREBASE_*` variables are configured, customer accounts, profiles, products, orders, GCash references, status histories, reviews, inventory movements, audit logs and store schedules are stored in Firebase and update connected screens in real time.
 
 The app retains a local preview fallback when Firebase variables are not available. Preview workspaces intentionally bypass login. Favorites and cart state remain browser-local for now.
 
 In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
 
-The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Manual GCash verification is protected by Firestore roles and updates the customer view in real time. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account.
+The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Manual GCash verification is protected by Firestore roles and updates the customer view in real time. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account. The Spark-compatible rules also protect append-only inventory movements and owner/staff audit records.
 
 Order-confirmation and order-status emails are not active yet. Password-reset email is the only current transactional email. A mail provider and a trusted server/Cloud Function are required so provider credentials are never exposed in the browser. The project also does not currently run a separate Laravel/REST backend; Firebase Authentication and Cloud Firestore are its active application APIs.
 
@@ -125,10 +129,10 @@ npm run build
 ```
 
 `npm run test:rules` starts the local Firestore emulator and verifies public,
-customer, staff and owner permissions, including staff restocking restrictions,
+customer, staff and owner permissions, including GCash detail submission, inventory movement/audit records and staff restocking restrictions,
 without reading or changing live data.
 GitHub Actions runs both automated test suites before every Pages deployment.
 
-The reusable `scripts/browser-qa.mjs` launches an isolated browser session and tests the catalog, themes, cart, checkout, GCash verification, pickup QR, custom reports, inventory, accounts, reviews and responsive screens without touching the normal browser profile.
+The reusable `scripts/browser-qa.mjs` launches an isolated browser session and tests the catalog, themes, cart, scheduled checkout, GCash references and verification, printable receipt, notifications, pickup QR, custom reports, inventory ledger, audit log, accounts, reviews and responsive screens without touching the normal browser profile.
 
 Set `VITE_FIREBASE_DISABLED=true` when starting the QA server so the suite uses isolated browser-local preview data instead of the live Firebase project.
