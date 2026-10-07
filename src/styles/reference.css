@@ -1824,6 +1824,42 @@ textarea {
   display: flex;
   justify-content: center;
 }
+.auth-email-sent {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px 18px 8px;
+  text-align: center;
+}
+.auth-email-sent h2,
+.auth-email-sent p {
+  margin: 0;
+}
+.auth-email-sent strong {
+  overflow-wrap: anywhere;
+  color: var(--primary-orange-hover);
+}
+.auth-email-sent small {
+  color: var(--muted-text-color);
+}
+.auth-email-sent .full-button {
+  margin-top: 8px;
+}
+.email-verification-card {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+.email-verification-card form {
+  display: grid;
+  width: 100%;
+  gap: 14px;
+  text-align: left;
+}
+.email-verification-card form p {
+  margin: 0;
+  text-align: center;
+}
 .access-heading {
   max-width: 630px;
   margin: 10px auto 30px;

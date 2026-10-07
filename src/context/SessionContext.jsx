@@ -9,15 +9,31 @@ import {
 } from "react";
 import {
   createUserWithEmailAndPassword,
+  isSignInWithEmailLink,
   onAuthStateChanged,
+  sendEmailVerification,
   sendPasswordResetEmail,
-  signInWithEmailAndPassword,
+  sendSignInLinkToEmail,
+  signInWithEmailLink,
   signOut as signOutFromFirebase,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { getAccounts, hashPassword, saveAccount } from "../utils/accounts";
-import { firebaseAuth, firebaseConfigured, firestore } from "../lib/firebase";
+import {
+  createLoginVerificationSession,
+  firebaseAuth,
+  firebaseConfigured,
+  firestore,
+} from "../lib/firebase";
+import {
+  clearPendingEmailLogin,
+  emailActionUrl,
+  normalizeEmail,
+  readPendingEmailLogin,
+  safeDestination,
+  savePendingEmailLogin,
+} from "../utils/emailAuth";
 import { readStorage, writeStorage } from "../utils/storage";
 
 const SessionContext = createContext();
@@ -40,6 +56,13 @@ const messageForAuthError = (error, fallback) => {
       return "Check your internet connection and try again.";
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a moment, then try again.";
+    case "auth/operation-not-allowed":
+      return "Email-link sign-in is not enabled in Firebase yet.";
+    case "auth/expired-action-code":
+      return "This email sign-in link has expired. Please request a new one.";
+    case "auth/invalid-action-code":
+    case "auth/invalid-email-link":
+      return "This email sign-in link is invalid or has already been used.";
     case "permission-denied":
     case "firestore/permission-denied":
       return "Your account does not have permission for that action.";
@@ -59,6 +82,9 @@ const profileFor = (authUser, profile) => ({
   createdAt: profile.createdAt || null,
   updatedAt: profile.updatedAt || null,
 });
+
+const actionUrl = (route) =>
+  emailActionUrl(route, window.location.origin, import.meta.env.BASE_URL);
 
 export function SessionProvider({ children }) {
   const registrationInProgress = useRef(false);
@@ -84,6 +110,17 @@ export function SessionProvider({ children }) {
       unsubscribeProfile();
       if (!authUser) {
         setUser(null);
+        setReady(true);
+        return;
+      }
+      if (!authUser.emailVerified) {
+        if (registrationInProgress.current) {
+          setReady(false);
+          return;
+        }
+        setUser(null);
+        setDemoRole("customer");
+        signOutFromFirebase(firebaseAuth).catch(() => {});
         setReady(true);
         return;
       }
@@ -127,43 +164,81 @@ export function SessionProvider({ children }) {
   const login = useCallback(
     async (email, password, selectedRole) => {
       if (firebaseConfigured && firebaseAuth && firestore) {
+        let verificationSession;
         try {
-          const credential = await signInWithEmailAndPassword(
-            firebaseAuth,
-            email.trim(),
+          const normalizedEmail = normalizeEmail(email);
+          verificationSession = await createLoginVerificationSession(
+            normalizedEmail,
             password,
           );
           const profileSnapshot = await getDoc(
-            doc(firestore, "profiles", credential.user.uid),
+            doc(
+              verificationSession.firestore,
+              "profiles",
+              verificationSession.user.uid,
+            ),
           );
           if (!profileSnapshot.exists()) {
-            await signOutFromFirebase(firebaseAuth);
             return {
               ok: false,
               error:
                 "This account has no Tita Mars role yet. Ask the owner to assign it.",
             };
           }
-          const account = profileFor(credential.user, profileSnapshot.data());
+          const account = profileFor(
+            verificationSession.user,
+            profileSnapshot.data(),
+          );
           if (!account.active) {
-            await signOutFromFirebase(firebaseAuth);
             return { ok: false, error: "This account is currently inactive." };
           }
           if (account.role !== selectedRole) {
-            await signOutFromFirebase(firebaseAuth);
             return {
               ok: false,
               error: `This email is registered as ${account.role}, not ${selectedRole}.`,
             };
           }
-          setUser(account);
-          setDemoRole(account.role);
-          return { ok: true, account };
+          if (!verificationSession.user.emailVerified) {
+            await sendEmailVerification(verificationSession.user, {
+              url: actionUrl(`login?role=${account.role}&verified=1`),
+            });
+            return {
+              ok: true,
+              emailVerificationSent: true,
+              email: normalizedEmail,
+            };
+          }
+
+          await sendSignInLinkToEmail(
+            verificationSession.auth,
+            normalizedEmail,
+            {
+              url: actionUrl("verify-email"),
+              handleCodeInApp: true,
+            },
+          );
+          savePendingEmailLogin({
+            email: normalizedEmail,
+            role: account.role,
+            next: safeDestination(
+              new URLSearchParams(window.location.hash.split("?")[1] || "").get(
+                "next",
+              ),
+              account.role,
+            ),
+          });
+          return {
+            ok: true,
+            emailLoginSent: true,
+            email: normalizedEmail,
+          };
         } catch (error) {
           return {
             ok: false,
             error: messageForAuthError(error, "Unable to sign in. Please try again."),
           };
+        } finally {
+          await verificationSession?.finish().catch(() => {});
         }
       }
 
@@ -212,10 +287,17 @@ export function SessionProvider({ children }) {
         await updateFirebaseProfile(credential.user, {
           displayName: profile.name,
         }).catch(() => {});
-        const account = profileFor(credential.user, profile);
-        setUser(account);
+        await sendEmailVerification(credential.user, {
+          url: actionUrl("login?role=customer&verified=1"),
+        });
+        await signOutFromFirebase(firebaseAuth);
+        setUser(null);
         setDemoRole("customer");
-        return { ok: true, account };
+        return {
+          ok: true,
+          emailVerificationSent: true,
+          email: profile.email,
+        };
       } catch (error) {
         if (firebaseAuth.currentUser)
           await signOutFromFirebase(firebaseAuth).catch(() => {});
@@ -237,6 +319,67 @@ export function SessionProvider({ children }) {
       setDemoRole("customer");
     }
     return result;
+  }, []);
+
+  const completeEmailLogin = useCallback(async (email, link) => {
+    if (!firebaseConfigured || !firebaseAuth || !firestore)
+      return {
+        ok: false,
+        error: "Email verification is available in the Firebase version.",
+      };
+    if (!isSignInWithEmailLink(firebaseAuth, link))
+      return {
+        ok: false,
+        error: "This is not a valid Tita Mars email sign-in link.",
+      };
+
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail)
+      return { ok: false, error: "Enter the email that received this link." };
+    try {
+      const pending = readPendingEmailLogin();
+      const credential = await signInWithEmailLink(
+        firebaseAuth,
+        normalizedEmail,
+        link,
+      );
+      const profileSnapshot = await getDoc(
+        doc(firestore, "profiles", credential.user.uid),
+      );
+      if (!profileSnapshot.exists()) {
+        await signOutFromFirebase(firebaseAuth);
+        return {
+          ok: false,
+          error: "This account has no Tita Mars profile.",
+        };
+      }
+      const account = profileFor(credential.user, profileSnapshot.data());
+      if (!account.active || (pending?.role && pending.role !== account.role)) {
+        await signOutFromFirebase(firebaseAuth);
+        return {
+          ok: false,
+          error: !account.active
+            ? "This account is currently inactive."
+            : "This email link does not match the selected account type.",
+        };
+      }
+      clearPendingEmailLogin();
+      setUser(account);
+      setDemoRole(account.role);
+      return {
+        ok: true,
+        account,
+        next: safeDestination(pending?.next, account.role),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: messageForAuthError(
+          error,
+          "Unable to verify this email link. Please request a new one.",
+        ),
+      };
+    }
   }, []);
 
   const resetPassword = useCallback(async (email) => {
@@ -324,12 +467,19 @@ export function SessionProvider({ children }) {
       setupOwner,
       updateProfile,
       resetPassword,
+      completeEmailLogin,
+      pendingEmailLogin: readPendingEmailLogin(),
+      isEmailLoginLink:
+        firebaseConfigured && firebaseAuth
+          ? isSignInWithEmailLink(firebaseAuth, window.location.href)
+          : false,
       setRole: (next) => {
         if (firebaseConfigured) return;
         setUser(null);
         setDemoRole(next);
       },
       signOut: () => {
+        clearPendingEmailLogin();
         if (firebaseConfigured && firebaseAuth)
           signOutFromFirebase(firebaseAuth).catch(() => {});
         setUser(null);
@@ -344,6 +494,7 @@ export function SessionProvider({ children }) {
         : getAccounts().some((account) => account.role === "owner"),
     }),
     [
+      completeEmailLogin,
       login,
       ready,
       register,

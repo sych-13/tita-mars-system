@@ -311,13 +311,15 @@ try {
   go("manage-orders?order=" + firstOrder.id);
   for (const status of ["Confirmed", "Preparing", "Out for Delivery"]) {
     select("dialog select", status);
-    click("dialog>.full-button");
+    pause();
+    clickText("Update Status", "dialog");
     pause();
     assert.equal(products().find((p) => p.id === "TME-001").stock, 20);
     go("manage-orders?order=" + firstOrder.id);
   }
   select("dialog select", "Completed");
-  click("dialog>.full-button");
+  pause();
+  clickText("Update Status", "dialog");
   pause();
   assert.equal(products().find((p) => p.id === "TME-001").stock, 18);
   go("manage-orders?order=" + firstOrder.id);
@@ -332,7 +334,8 @@ try {
   go("manage-orders?order=" + secondOrder.id);
   for (const status of ["Confirmed", "Preparing", "Ready for Pickup"]) {
     select("dialog select", status);
-    click("dialog>.full-button");
+    pause();
+    clickText("Update Status", "dialog");
     pause();
     assert.equal(products().find((p) => p.id === "TME-001").stock, 18);
     go("manage-orders?order=" + secondOrder.id);

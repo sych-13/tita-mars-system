@@ -5,6 +5,7 @@ import {
   getAuth,
   inMemoryPersistence,
   setPersistence,
+  signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -45,13 +46,20 @@ export const firebaseFunctions = trustedBackendEnabled
   : null;
 
 const STAFF_CREATOR_APP = "tita-mars-staff-creator";
+const LOGIN_VERIFIER_APP = "tita-mars-login-verifier";
+
+function secondaryFirebaseApp(name) {
+  return (
+    getApps().find((app) => app.name === name) ||
+    initializeApp(firebaseConfig, name)
+  );
+}
 
 export async function createStaffAuthUser(email, password) {
   if (!firebaseConfigured)
     throw new Error("Firebase is not configured for this build.");
 
-  const existingApp = getApps().find((app) => app.name === STAFF_CREATOR_APP);
-  const app = existingApp || initializeApp(firebaseConfig, STAFF_CREATOR_APP);
+  const app = secondaryFirebaseApp(STAFF_CREATOR_APP);
   const auth = getAuth(app);
   await setPersistence(auth, inMemoryPersistence);
   if (auth.currentUser) await signOut(auth);
@@ -67,5 +75,28 @@ export async function createStaffAuthUser(email, password) {
     email: credential.user.email || email.trim().toLowerCase(),
     finish: () => signOut(auth),
     discard: () => deleteUser(credential.user),
+  };
+}
+
+export async function createLoginVerificationSession(email, password) {
+  if (!firebaseConfigured)
+    throw new Error("Firebase is not configured for this build.");
+
+  const app = secondaryFirebaseApp(LOGIN_VERIFIER_APP);
+  const auth = getAuth(app);
+  await setPersistence(auth, inMemoryPersistence);
+  if (auth.currentUser) await signOut(auth);
+
+  const credential = await signInWithEmailAndPassword(
+    auth,
+    email.trim().toLowerCase(),
+    password,
+  );
+
+  return {
+    auth,
+    firestore: getFirestore(app),
+    user: credential.user,
+    finish: () => signOut(auth),
   };
 }

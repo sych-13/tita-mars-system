@@ -5,8 +5,12 @@ rules_version = '2';
 // deployed to the web application.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+    function authenticated() {
       return request.auth != null;
+    }
+
+    function signedIn() {
+      return authenticated() && request.auth.token.email_verified == true;
     }
 
     function profilePath(userId) {
@@ -169,11 +173,11 @@ service cloud.firestore {
     }
 
     match /profiles/{profileId} {
-      allow read: if signedIn() && (request.auth.uid == profileId || isOwner());
+      allow read: if (authenticated() && request.auth.uid == profileId) || isOwner();
       allow create: if (isOwner() && validProfile() &&
           request.resource.data.role == 'staff' &&
           request.resource.data.active == true) ||
-        (signedIn() && validProfile() && request.auth.uid == profileId &&
+        (authenticated() && validProfile() && request.auth.uid == profileId &&
           request.resource.data.role == 'customer' &&
           request.resource.data.active == true);
       allow update: if (isOwner() && validProfile() &&

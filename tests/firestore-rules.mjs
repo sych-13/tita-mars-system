@@ -21,6 +21,8 @@ const rulesPath = resolve(
 );
 
 let testEnv;
+const verifiedContext = (uid) =>
+  testEnv.authenticatedContext(uid, { email_verified: true });
 
 const iso = (minute = 0) => `2026-10-01T00:${String(minute).padStart(2, "0")}:00.000Z`;
 
@@ -199,7 +201,7 @@ test("public visitors can read the catalog and store settings only", async () =>
 });
 
 test("customers can create only their own valid pending orders", async () => {
-  const db = testEnv.authenticatedContext("customer-a").firestore();
+  const db = verifiedContext("customer-a").firestore();
   await assertSucceeds(
     setDoc(doc(db, "orders/customer-order"), order("customer-order", "customer-a")),
   );
@@ -215,7 +217,7 @@ test("customers can create only their own valid pending orders", async () => {
 });
 
 test("customers cannot read another customer's orders", async () => {
-  const db = testEnv.authenticatedContext("customer-a").firestore();
+  const db = verifiedContext("customer-a").firestore();
   await assertSucceeds(getDoc(doc(db, "orders/order-a")));
   await assertFails(getDoc(doc(db, "orders/order-b")));
 });
@@ -228,6 +230,13 @@ test("new users cannot assign themselves staff or owner access", async () => {
       profile("New Customer", "new@example.com", "customer"),
     ),
   );
+  await assertSucceeds(getDoc(doc(customerDb, "profiles/new-customer")));
+  await assertFails(
+    setDoc(
+      doc(customerDb, "orders/unverified-order"),
+      order("unverified-order", "new-customer"),
+    ),
+  );
   const attackerDb = testEnv.authenticatedContext("attacker").firestore();
   await assertFails(
     setDoc(
@@ -238,7 +247,7 @@ test("new users cannot assign themselves staff or owner access", async () => {
 });
 
 test("staff can follow order status transitions but cannot skip or edit totals", async () => {
-  const db = testEnv.authenticatedContext("staff-1").firestore();
+  const db = verifiedContext("staff-1").firestore();
   const orderRef = doc(db, "orders/order-a");
   await assertFails(
     updateDoc(orderRef, { status: "Completed", updatedAt: iso(1), inventoryDeductedAt: iso(1) }),
@@ -264,8 +273,8 @@ test("staff can verify only GCash payments and customers cannot self-verify", as
       order("gcash-order", "customer-a", { payment: "gcash" }),
     );
   });
-  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
-  const customerDb = testEnv.authenticatedContext("customer-a").firestore();
+  const staffDb = verifiedContext("staff-1").firestore();
+  const customerDb = verifiedContext("customer-a").firestore();
   const gcashRef = doc(staffDb, "orders/gcash-order");
   await assertFails(
     updateDoc(doc(customerDb, "orders/gcash-order"), {
@@ -316,7 +325,7 @@ test("customers can submit GCash details but cannot alter payment state", async 
       order("gcash-details", "customer-a", { payment: "gcash" }),
     );
   });
-  const db = testEnv.authenticatedContext("customer-a").firestore();
+  const db = verifiedContext("customer-a").firestore();
   const orderRef = doc(db, "orders/gcash-details");
   await assertSucceeds(
     updateDoc(orderRef, {
@@ -341,8 +350,8 @@ test("customers can submit GCash details but cannot alter payment state", async 
 });
 
 test("staff can append valid inventory and audit records only as themselves", async () => {
-  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
-  const customerDb = testEnv.authenticatedContext("customer-a").firestore();
+  const staffDb = verifiedContext("staff-1").firestore();
+  const customerDb = verifiedContext("customer-a").firestore();
   await assertSucceeds(
     setDoc(doc(staffDb, "inventoryMovements/move-1"), movement("move-1")),
   );
@@ -364,7 +373,7 @@ test("staff can append valid inventory and audit records only as themselves", as
 });
 
 test("staff may adjust stock but cannot edit product details or availability independently", async () => {
-  const db = testEnv.authenticatedContext("staff-1").firestore();
+  const db = verifiedContext("staff-1").firestore();
   const productRef = doc(db, "products/TME-001");
   await assertSucceeds(updateDoc(productRef, { stock: 25, updatedAt: iso(1) }));
   await assertSucceeds(
@@ -380,8 +389,8 @@ test("staff may adjust stock but cannot edit product details or availability ind
 });
 
 test("only owners can manage products, store settings, and staff profiles", async () => {
-  const ownerDb = testEnv.authenticatedContext("owner-1").firestore();
-  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  const ownerDb = verifiedContext("owner-1").firestore();
+  const staffDb = verifiedContext("staff-1").firestore();
   await assertSucceeds(setDoc(doc(ownerDb, "products/TME-002"), product("TME-002")));
   await assertSucceeds(
     updateDoc(doc(ownerDb, "settings/store"), { deliveryFee: 25 }),
@@ -413,7 +422,7 @@ test("a customer can review a completed own order only once", async () => {
       }),
     );
   });
-  const db = testEnv.authenticatedContext("customer-a").firestore();
+  const db = verifiedContext("customer-a").firestore();
   const orderRef = doc(db, "orders/completed-order");
   await assertSucceeds(
     updateDoc(orderRef, {
