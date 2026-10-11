@@ -4,14 +4,7 @@ import { useSession } from "../context/SessionContext";
 import { useHashRoute } from "../hooks/useHashRoute";
 import BrandMark from "./BrandMark";
 import Icon from "./Icon";
-
-function SocialMark({ provider }) {
-  return (
-    <span className={`social-mark social-mark-${provider}`} aria-hidden="true">
-      {provider === "facebook" ? "f" : "G"}
-    </span>
-  );
-}
+import SocialIcon from "./SocialIcon";
 
 export default function AuthPage({ mode = "login" }) {
   const { params, navigate } = useHashRoute();
@@ -198,7 +191,7 @@ export default function AuthPage({ mode = "login" }) {
               disabled={busy || Boolean(socialBusy)}
               onClick={() => continueWithSocial("google")}
             >
-              <SocialMark provider="google" />
+              <SocialIcon provider="google" />
               {socialBusy === "google"
                 ? "Opening Google..."
                 : `Continue with Google`}
@@ -209,7 +202,7 @@ export default function AuthPage({ mode = "login" }) {
               disabled={busy || Boolean(socialBusy)}
               onClick={() => continueWithSocial("facebook")}
             >
-              <SocialMark provider="facebook" />
+              <SocialIcon provider="facebook" />
               {socialBusy === "facebook"
                 ? "Opening Facebook..."
                 : `Continue with Facebook`}

@@ -3,6 +3,7 @@ import { useSession } from "../context/SessionContext";
 import { useShop } from "../context/ShopContext";
 import ThemeToggle from "./ThemeToggle";
 import Icon from "./Icon";
+import SocialIcon from "./SocialIcon";
 export default function ProfilePage() {
   const {
     user,
@@ -133,12 +134,7 @@ export default function ProfilePage() {
                     {connected ? (
                       <Icon name="check" size={16} />
                     ) : (
-                      <span
-                        className={`social-mark social-mark-${provider}`}
-                        aria-hidden="true"
-                      >
-                        {provider === "facebook" ? "f" : "G"}
-                      </span>
+                      <SocialIcon provider={provider} size={18} />
                     )}
                     {connected
                       ? `${label} connected`

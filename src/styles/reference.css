@@ -1814,28 +1814,10 @@ textarea {
   transform: translateY(-1px);
 }
 .social-mark {
-  display: inline-grid;
+  display: block;
   width: 22px;
   height: 22px;
   flex: 0 0 22px;
-  place-items: center;
-  border-radius: 50%;
-  font-family: Arial, sans-serif;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
-}
-.social-mark-google {
-  border: 1px solid var(--border-color);
-  background: var(--surface-color);
-  color: #4285f4;
-}
-.social-mark-facebook {
-  padding-top: 3px;
-  background: #1877f2;
-  color: #fff;
-  font-family: Arial, sans-serif;
-  font-size: 19px;
 }
 .social-role-note {
   color: var(--muted-text-color);
@@ -2047,11 +2029,6 @@ textarea {
   width: 18px;
   height: 18px;
   flex-basis: 18px;
-  font-size: 12px;
-}
-.connected-account-actions .social-mark-facebook {
-  padding-top: 2px;
-  font-size: 16px;
 }
 .account-connected {
   border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
