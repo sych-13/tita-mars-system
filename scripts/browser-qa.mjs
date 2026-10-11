@@ -551,6 +551,7 @@ try {
       "my-orders",
       "about",
       "login",
+      "register",
       "profile",
       "product?id=TME-001",
     ]) {
@@ -567,10 +568,19 @@ try {
         evaluate("document.documentElement.scrollWidth <= innerWidth"),
         route + " overflow at " + viewport[0],
       );
+      if (
+        viewport[0] === "390" &&
+        ["login", "register"].includes(route)
+      ) {
+        assert(
+          !evaluate('document.querySelector(".mobile-bottom-nav")'),
+          route + " must not cover authentication content",
+        );
+      }
     }
   }
   pass(
-    "9 customer routes render without overflow at desktop, tablet and mobile widths",
+    "10 customer routes render without overflow; mobile auth content stays unobstructed",
   );
   const errorData = call("errors");
   console.log("PAGE_ERRORS " + JSON.stringify(errorData));

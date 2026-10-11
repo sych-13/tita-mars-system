@@ -4,10 +4,20 @@ import Icon from "../components/Icon";
 import { useHashRoute } from "../hooks/useHashRoute";
 import { useCart } from "../context/CartContext";
 import { useSession } from "../context/SessionContext";
+
+const AUTH_ROUTES = new Set([
+  "login",
+  "register",
+  "setup",
+  "forgot-password",
+  "verify-email",
+]);
+
 export default function CustomerLayout({ children }) {
   const { route } = useHashRoute();
   const { itemCount } = useCart();
   const { role } = useSession();
+  const showMobileNavigation = !AUTH_ROUTES.has(route);
   const workspace =
     role === "owner"
       ? ["owner", "chart", "Workspace"]
@@ -37,26 +47,28 @@ export default function CustomerLayout({ children }) {
         {children}
       </main>
       <Footer />
-      <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
-        {nav.map(([path, icon, label]) => (
-          <a
-            key={path}
-            href={`#${path}`}
-            className={route === path ? "active" : ""}
-            aria-current={route === path ? "page" : undefined}
-          >
-            <span>
-              <Icon
-                name={icon}
-                weight={route === path ? "fill" : "regular"}
-                size={22}
-              />
-              {path === "cart" && itemCount > 0 && <b>{itemCount}</b>}
-            </span>
-            {label}
-          </a>
-        ))}
-      </nav>
+      {showMobileNavigation && (
+        <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+          {nav.map(([path, icon, label]) => (
+            <a
+              key={path}
+              href={`#${path}`}
+              className={route === path ? "active" : ""}
+              aria-current={route === path ? "page" : undefined}
+            >
+              <span>
+                <Icon
+                  name={icon}
+                  weight={route === path ? "fill" : "regular"}
+                  size={22}
+                />
+                {path === "cart" && itemCount > 0 && <b>{itemCount}</b>}
+              </span>
+              {label}
+            </a>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
