@@ -9,12 +9,16 @@ import {
 } from "react";
 import {
   createUserWithEmailAndPassword,
+  FacebookAuthProvider,
+  GoogleAuthProvider,
   isSignInWithEmailLink,
+  linkWithPopup,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInWithEmailLink,
+  signInWithPopup,
   signOut as signOutFromFirebase,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
@@ -57,7 +61,20 @@ const messageForAuthError = (error, fallback) => {
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a moment, then try again.";
     case "auth/operation-not-allowed":
-      return "Email-link sign-in is not enabled in Firebase yet.";
+      return "This sign-in method is not enabled in Firebase yet.";
+    case "auth/account-exists-with-different-credential":
+      return "An account already uses this email. Sign in with its existing method, then connect this social account from My Profile.";
+    case "auth/credential-already-in-use":
+      return "This social account is already connected to another Tita Mars account.";
+    case "auth/provider-already-linked":
+      return "This social account is already connected.";
+    case "auth/popup-blocked":
+      return "Your browser blocked the sign-in window. Allow pop-ups for Tita Mars, then try again.";
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
+      return "The sign-in window was closed before login was completed.";
+    case "auth/unauthorized-domain":
+      return "This website domain is not authorized in Firebase Authentication.";
     case "auth/expired-action-code":
       return "This email sign-in link has expired. Please request a new one.";
     case "auth/invalid-action-code":
@@ -86,8 +103,25 @@ const profileFor = (authUser, profile) => ({
 const actionUrl = (route) =>
   emailActionUrl(route, window.location.origin, import.meta.env.BASE_URL);
 
+const socialProvider = (providerName) => {
+  if (providerName === "google") {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    return provider;
+  }
+  if (providerName === "facebook") {
+    const provider = new FacebookAuthProvider();
+    provider.addScope("email");
+    return provider;
+  }
+  throw new Error("Unsupported social sign-in provider.");
+};
+
+const providerIdsFor = (authUser) =>
+  authUser?.providerData?.map((provider) => provider.providerId) || [];
+
 export function SessionProvider({ children }) {
-  const registrationInProgress = useRef(false);
+  const authFlowInProgress = useRef(false);
   const [user, setUser] = useState(() => {
     if (firebaseConfigured) return null;
     const saved = readStorage(SESSION_KEY, null);
@@ -101,6 +135,7 @@ export function SessionProvider({ children }) {
     () => localStorage.getItem("tita-mars-role") || "customer",
   );
   const [ready, setReady] = useState(!firebaseConfigured);
+  const [authProviders, setAuthProviders] = useState([]);
   const role = user?.role || (firebaseConfigured ? "customer" : demoRole);
 
   useEffect(() => {
@@ -110,11 +145,12 @@ export function SessionProvider({ children }) {
       unsubscribeProfile();
       if (!authUser) {
         setUser(null);
+        setAuthProviders([]);
         setReady(true);
         return;
       }
       if (!authUser.emailVerified) {
-        if (registrationInProgress.current) {
+        if (authFlowInProgress.current) {
           setReady(false);
           return;
         }
@@ -128,7 +164,7 @@ export function SessionProvider({ children }) {
         doc(firestore, "profiles", authUser.uid),
         (snapshot) => {
           if (!snapshot.exists() || snapshot.data().active === false) {
-            if (!snapshot.exists() && registrationInProgress.current) {
+            if (!snapshot.exists() && authFlowInProgress.current) {
               setReady(false);
               return;
             }
@@ -140,6 +176,7 @@ export function SessionProvider({ children }) {
           }
           const account = profileFor(authUser, snapshot.data());
           setUser(account);
+          setAuthProviders(providerIdsFor(authUser));
           setDemoRole(account.role);
           setReady(true);
         },
@@ -265,7 +302,7 @@ export function SessionProvider({ children }) {
 
   const register = useCallback(async (data) => {
     if (firebaseConfigured && firebaseAuth && firestore) {
-      registrationInProgress.current = true;
+      authFlowInProgress.current = true;
       try {
         const credential = await createUserWithEmailAndPassword(
           firebaseAuth,
@@ -309,7 +346,7 @@ export function SessionProvider({ children }) {
           ),
         };
       } finally {
-        registrationInProgress.current = false;
+        authFlowInProgress.current = false;
       }
     }
 
@@ -319,6 +356,119 @@ export function SessionProvider({ children }) {
       setDemoRole("customer");
     }
     return result;
+  }, []);
+
+  const loginWithSocial = useCallback(async (providerName, selectedRole) => {
+    if (!firebaseConfigured || !firebaseAuth || !firestore)
+      return {
+        ok: false,
+        error: "Social sign-in is available in the Firebase version.",
+      };
+
+    authFlowInProgress.current = true;
+    let credential;
+    try {
+      credential = await signInWithPopup(
+        firebaseAuth,
+        socialProvider(providerName),
+      );
+      const authUser = credential.user;
+      if (!authUser.email) {
+        await signOutFromFirebase(firebaseAuth);
+        return {
+          ok: false,
+          error:
+            "This social account did not share an email address. Allow email access, then try again.",
+        };
+      }
+      if (!authUser.emailVerified) {
+        await signOutFromFirebase(firebaseAuth);
+        return {
+          ok: false,
+          error:
+            "This social account does not have a verified email. Use a verified account or register with email.",
+        };
+      }
+
+      const profileRef = doc(firestore, "profiles", authUser.uid);
+      const profileSnapshot = await getDoc(profileRef);
+      let account;
+
+      if (profileSnapshot.exists()) {
+        account = profileFor(authUser, profileSnapshot.data());
+        if (!account.active) {
+          await signOutFromFirebase(firebaseAuth);
+          return { ok: false, error: "This account is currently inactive." };
+        }
+        if (account.role !== selectedRole) {
+          await signOutFromFirebase(firebaseAuth);
+          return {
+            ok: false,
+            error: `This social account is registered as ${account.role}, not ${selectedRole}.`,
+          };
+        }
+      } else {
+        if (selectedRole !== "customer") {
+          await signOutFromFirebase(firebaseAuth);
+          return {
+            ok: false,
+            error:
+              "New social accounts can only register as customers. Sign in with your existing staff or owner account first, then connect this social account from My Profile.",
+          };
+        }
+        const timestamp = new Date().toISOString();
+        const profile = {
+          name: authUser.displayName?.trim() || "Tita Mars customer",
+          email: authUser.email.toLowerCase(),
+          phone: "",
+          address: "",
+          role: "customer",
+          active: true,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        await setDoc(profileRef, profile);
+        account = profileFor(authUser, profile);
+      }
+
+      setUser(account);
+      setAuthProviders(providerIdsFor(authUser));
+      setDemoRole(account.role);
+      return { ok: true, account };
+    } catch (error) {
+      if (credential?.user) await signOutFromFirebase(firebaseAuth).catch(() => {});
+      return {
+        ok: false,
+        error: messageForAuthError(
+          error,
+          `Unable to sign in with ${providerName === "facebook" ? "Facebook" : "Google"}. Please try again.`,
+        ),
+      };
+    } finally {
+      authFlowInProgress.current = false;
+    }
+  }, []);
+
+  const linkSocialProvider = useCallback(async (providerName) => {
+    if (!firebaseConfigured || !firebaseAuth?.currentUser)
+      return { ok: false, error: "Sign in before connecting an account." };
+    try {
+      const credential = await linkWithPopup(
+        firebaseAuth.currentUser,
+        socialProvider(providerName),
+      );
+      const providers = providerIdsFor(credential.user);
+      setAuthProviders(providers);
+      return { ok: true, providers };
+    } catch (error) {
+      return {
+        ok: false,
+        error: messageForAuthError(
+          error,
+          `Unable to connect ${providerName === "facebook" ? "Facebook" : "Google"}.`,
+        ),
+      };
+    }
   }, []);
 
   const completeEmailLogin = useCallback(async (email, link) => {
@@ -462,10 +612,13 @@ export function SessionProvider({ children }) {
       role,
       ready,
       usingFirebase: firebaseConfigured,
+      authProviders,
       login,
+      loginWithSocial,
       register,
       setupOwner,
       updateProfile,
+      linkSocialProvider,
       resetPassword,
       completeEmailLogin,
       pendingEmailLogin: readPendingEmailLogin(),
@@ -495,7 +648,10 @@ export function SessionProvider({ children }) {
     }),
     [
       completeEmailLogin,
+      authProviders,
+      linkSocialProvider,
       login,
+      loginWithSocial,
       ready,
       register,
       resetPassword,

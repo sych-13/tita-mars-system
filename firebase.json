@@ -1,7 +1,11 @@
 {
   "auth": {
     "providers": {
-      "emailPassword": true
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Tita Mars Eatery and Bakery",
+        "supportEmail": "jmtiosayco9963@gmail.com"
+      }
     }
   },
   "firestore": {

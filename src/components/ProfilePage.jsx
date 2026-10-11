@@ -4,7 +4,14 @@ import { useShop } from "../context/ShopContext";
 import ThemeToggle from "./ThemeToggle";
 import Icon from "./Icon";
 export default function ProfilePage() {
-  const { user, updateProfile, role, usingFirebase } = useSession();
+  const {
+    user,
+    updateProfile,
+    role,
+    usingFirebase,
+    authProviders,
+    linkSocialProvider,
+  } = useSession();
   const { notify } = useShop();
   const [form, setForm] = useState({
     name: user?.name || "",
@@ -13,12 +20,23 @@ export default function ProfilePage() {
     address: user?.address || "",
   });
   const [busy, setBusy] = useState(false);
+  const [linking, setLinking] = useState("");
   const save = async (e) => {
     e.preventDefault();
     setBusy(true);
     const r = await updateProfile(form);
     notify(r.ok ? "Your profile was updated." : r.error);
     setBusy(false);
+  };
+  const connect = async (provider) => {
+    setLinking(provider);
+    const result = await linkSocialProvider(provider);
+    notify(
+      result.ok
+        ? `${provider === "facebook" ? "Facebook" : "Google"} is now connected.`
+        : result.error,
+    );
+    setLinking("");
   };
   if (!user)
     return (
@@ -90,6 +108,49 @@ export default function ProfilePage() {
             </label>
           ))}
         </div>
+        {usingFirebase && (
+          <div className="connected-accounts">
+            <div>
+              <span>Connected accounts</span>
+              <small>
+                Connect a social account so you can use it for your next login.
+              </small>
+            </div>
+            <div className="connected-account-actions">
+              {[
+                ["google", "google.com", "Google"],
+                ["facebook", "facebook.com", "Facebook"],
+              ].map(([provider, providerId, label]) => {
+                const connected = authProviders.includes(providerId);
+                return (
+                  <button
+                    className={connected ? "account-connected" : "btn-secondary"}
+                    type="button"
+                    disabled={connected || Boolean(linking)}
+                    onClick={() => connect(provider)}
+                    key={provider}
+                  >
+                    {connected ? (
+                      <Icon name="check" size={16} />
+                    ) : (
+                      <span
+                        className={`social-mark social-mark-${provider}`}
+                        aria-hidden="true"
+                      >
+                        {provider === "facebook" ? "f" : "G"}
+                      </span>
+                    )}
+                    {connected
+                      ? `${label} connected`
+                      : linking === provider
+                        ? `Connecting ${label}...`
+                        : `Connect ${label}`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="profile-theme">
           <span>Appearance</span>
           <ThemeToggle />

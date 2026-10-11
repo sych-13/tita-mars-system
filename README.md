@@ -53,6 +53,8 @@ The app retains a local preview fallback when Firebase variables are not availab
 
 In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. New customer, staff and owner accounts must verify their email first. After the password and role are checked, every login sends a single-use Firebase sign-in link to that email. Opening the link completes the session; opening it on another device asks for the matching email without putting the address in the link. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
 
+Google and Facebook are also supported as Firebase social sign-in providers. A first-time social user is always created as a customer; social login can never assign a staff or owner role. Existing staff and owner users must first sign in with their current method and connect Google or Facebook from **My Profile -> Connected accounts**. Google sign-in is configured by `firebase.json`. Facebook requires a one-time Meta app setup before its button can complete login.
+
 The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Manual GCash verification is protected by Firestore roles and updates the customer view in real time. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account. The Spark-compatible rules also protect append-only inventory movements and owner/staff audit records.
 
 Order-confirmation and order-status emails are not active yet. Firebase currently sends account-verification, one-time sign-in and password-reset emails. A separate mail provider and a trusted server/Cloud Function are still required for order emails so provider credentials are never exposed in the browser. The project also does not currently run a separate Laravel/REST backend; Firebase Authentication and Cloud Firestore are its active application APIs.
@@ -65,6 +67,22 @@ In **Firebase Console → Authentication → Sign-in method → Email/Password**
 - `sych-13.github.io`
 
 These settings are already active in the current Firebase project. Add `localhost` manually only for temporary local Firebase testing; it is not required by the isolated browser QA suite.
+
+### Social sign-in setup
+
+Google sign-in is enabled by the Firebase Auth deployment configuration. Deploy provider changes with:
+
+```powershell
+npx.cmd firebase-tools deploy --only auth
+```
+
+Facebook login additionally requires a Meta for Developers app. In the Meta app, enable Facebook Login and add this Valid OAuth Redirect URI:
+
+```text
+https://tita-mars-system-202609.firebaseapp.com/__/auth/handler
+```
+
+Then open **Firebase Console -> Authentication -> Sign-in method -> Facebook**, enable it, and enter the Meta App ID and App Secret. Keep the secret only in Firebase/Meta; never place it in `.env`, source code, GitHub, or a chat message. Until that setup is complete, Firebase will reject Facebook login as a disabled provider while Google and email login continue to work.
 
 ### Deploy to Firebase Hosting on the free Spark plan
 

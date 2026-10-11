@@ -4,9 +4,25 @@ import { useSession } from "../context/SessionContext";
 import { useHashRoute } from "../hooks/useHashRoute";
 import BrandMark from "./BrandMark";
 import Icon from "./Icon";
+
+function SocialMark({ provider }) {
+  return (
+    <span className={`social-mark social-mark-${provider}`} aria-hidden="true">
+      {provider === "facebook" ? "f" : "G"}
+    </span>
+  );
+}
+
 export default function AuthPage({ mode = "login" }) {
   const { params, navigate } = useHashRoute();
-  const { login, register, setupOwner, hasOwner, usingFirebase } = useSession();
+  const {
+    login,
+    loginWithSocial,
+    register,
+    setupOwner,
+    hasOwner,
+    usingFirebase,
+  } = useSession();
   const accountRole = ["staff", "owner"].includes(params.role)
     ? params.role
     : "customer";
@@ -21,6 +37,7 @@ export default function AuthPage({ mode = "login" }) {
   });
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [socialBusy, setSocialBusy] = useState("");
   const [error, setError] = useState("");
   const [emailStep, setEmailStep] = useState(null);
   const title = setup
@@ -33,6 +50,33 @@ export default function AuthPage({ mode = "login" }) {
           ? "Admin Login"
           : "Welcome Back!";
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const destinationFor = (account) =>
+    account.role === "owner"
+      ? "owner"
+      : account.role === "staff"
+        ? "staff"
+        : "home";
+
+  const continueWithSocial = async (provider) => {
+    setError("");
+    setSocialBusy(provider);
+    try {
+      const result = await loginWithSocial(
+        provider,
+        signup ? "customer" : accountRole,
+      );
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      navigate(params.next || destinationFor(result.account));
+    } catch {
+      setError("Unable to open social sign-in. Please try again.");
+    } finally {
+      setSocialBusy("");
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError("");
@@ -61,13 +105,7 @@ export default function AuthPage({ mode = "login" }) {
           });
           return;
         }
-        const defaultDestination =
-          result.account.role === "owner"
-            ? "owner"
-            : result.account.role === "staff"
-              ? "staff"
-              : "home";
-        navigate(params.next || defaultDestination);
+        navigate(params.next || destinationFor(result.account));
       }
       else setError(result.error);
     } catch {
@@ -151,6 +189,41 @@ export default function AuthPage({ mode = "login" }) {
             The first owner profile is assigned securely in Firebase, not from
             this public form. Follow the owner setup step after deployment.
           </p>
+        )}
+        {!emailStep && !setup && usingFirebase && (
+          <div className="social-auth">
+            <button
+              className="social-auth-button"
+              type="button"
+              disabled={busy || Boolean(socialBusy)}
+              onClick={() => continueWithSocial("google")}
+            >
+              <SocialMark provider="google" />
+              {socialBusy === "google"
+                ? "Opening Google..."
+                : `Continue with Google`}
+            </button>
+            <button
+              className="social-auth-button"
+              type="button"
+              disabled={busy || Boolean(socialBusy)}
+              onClick={() => continueWithSocial("facebook")}
+            >
+              <SocialMark provider="facebook" />
+              {socialBusy === "facebook"
+                ? "Opening Facebook..."
+                : `Continue with Facebook`}
+            </button>
+            {!signup && accountRole !== "customer" && (
+              <small className="social-role-note">
+                Use a social account already connected to this {accountRole}
+                profile.
+              </small>
+            )}
+            <div className="auth-divider" aria-hidden="true">
+              <span>or use email</span>
+            </div>
+          </div>
         )}
         {!emailStep && <form onSubmit={submit}>
           {(signup || setup) && (
