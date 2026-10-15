@@ -10,7 +10,6 @@ const AUTH_ROUTES = new Set([
   "register",
   "setup",
   "forgot-password",
-  "verify-email",
 ]);
 
 export default function CustomerLayout({ children }) {

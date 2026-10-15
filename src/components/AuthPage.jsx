@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { assetUrl } from "../utils/assets";
 import { useSession } from "../context/SessionContext";
 import { useHashRoute } from "../hooks/useHashRoute";
@@ -83,10 +83,9 @@ export default function AuthPage({ mode = "login" }) {
           ? await register(form)
           : await login(form.email, form.password, accountRole);
       if (result.ok) {
-        if (result.emailVerificationSent || result.emailLoginSent) {
+        if (result.emailVerificationSent) {
           setEmailStep({
             email: result.email,
-            type: result.emailVerificationSent ? "verify" : "login",
           });
           return;
         }
@@ -153,13 +152,12 @@ export default function AuthPage({ mode = "login" }) {
               <Icon name="email" size={22} />
             </span>
             <h2>Check your Gmail</h2>
-            <p>
-              {emailStep.type === "verify"
-                ? "Open the verification link before signing in."
-                : "Open the one-time sign-in link to finish logging in."}
-            </p>
+            <p>Open the verification link before signing in.</p>
             <strong>{emailStep.email}</strong>
-            <small>Also check your Spam folder. The link can only be used once.</small>
+            <small>
+              Also check your Spam folder. You only need to verify this email
+              once.
+            </small>
             <button
               className="btn-outline full-button"
               type="button"
@@ -343,98 +341,6 @@ export default function AuthPage({ mode = "login" }) {
   );
 }
 
-export function EmailLoginVerification() {
-  const {
-    completeEmailLogin,
-    isEmailLoginLink,
-    pendingEmailLogin,
-    usingFirebase,
-  } = useSession();
-  const { navigate } = useHashRoute();
-  const [email, setEmail] = useState(pendingEmailLogin?.email || "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const started = useRef(false);
-
-  const finish = async (address) => {
-    setBusy(true);
-    setError("");
-    const result = await completeEmailLogin(address, window.location.href);
-    if (!result.ok) {
-      setError(result.error);
-      setBusy(false);
-      return;
-    }
-    const clean = new URL(import.meta.env.BASE_URL, window.location.origin);
-    window.history.replaceState(null, "", `${clean.pathname}#verify-email`);
-    navigate(result.next);
-  };
-
-  useEffect(() => {
-    if (
-      started.current ||
-      !isEmailLoginLink ||
-      !pendingEmailLogin?.email
-    )
-      return;
-    started.current = true;
-    finish(pendingEmailLogin.email);
-  }, [isEmailLoginLink, pendingEmailLogin?.email]);
-
-  return (
-    <section className="page-section container narrow-page">
-      <div className="simple-card email-verification-card">
-        <Icon name="email" size={36} />
-        <p className="eyebrow">Secure sign in</p>
-        <h1>{busy ? "Verifying your link…" : "Confirm your email"}</h1>
-        {!usingFirebase || !isEmailLoginLink ? (
-          <p className="form-error" role="alert">
-            This sign-in link is missing, invalid, or not available in this
-            preview. Return to login and request a new link.
-          </p>
-        ) : pendingEmailLogin?.email ? (
-          <p role="status">
-            Signing in securely as <strong>{pendingEmailLogin.email}</strong>.
-          </p>
-        ) : (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              finish(email);
-            }}
-          >
-            <p>
-              Enter the same email address that received this one-time link.
-            </p>
-            <label>
-              Email address
-              <input
-                required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-              />
-            </label>
-            <button className="btn-brand full-button" disabled={busy}>
-              {busy ? "Verifying…" : "Verify and sign in"}
-            </button>
-          </form>
-        )}
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-        {!busy && (
-          <a className="btn-outline" href="#login">
-            Request a new link
-          </a>
-        )}
-      </div>
-    </section>
-  );
-}
 export function ForgotPassword() {
   const { resetPassword, usingFirebase } = useSession();
   const [email, setEmail] = useState("");

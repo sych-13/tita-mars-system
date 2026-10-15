@@ -20,10 +20,7 @@ import ReportsPage from "./components/ReportsPage";
 import AboutPage from "./components/AboutPage";
 import AccessPage from "./components/AccessPage";
 import { ShopProvider } from "./context/ShopContext";
-import AuthPage, {
-  EmailLoginVerification,
-  ForgotPassword,
-} from "./components/AuthPage";
+import AuthPage, { ForgotPassword } from "./components/AuthPage";
 import ProfilePage from "./components/ProfilePage";
 import ProductDetail from "./components/ProductDetail";
 import StaffManagement from "./components/StaffManagement";
@@ -176,12 +173,6 @@ function AppViews() {
       return (
         <CustomerPage>
           <ForgotPassword />
-        </CustomerPage>
-      );
-    case "verify-email":
-      return (
-        <CustomerPage>
-          <EmailLoginVerification />
         </CustomerPage>
       );
     case "profile":

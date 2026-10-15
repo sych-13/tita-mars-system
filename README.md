@@ -34,7 +34,7 @@ npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 - A unique pickup-verification QR is shown when a pickup order reaches **Ready for Pickup**. Scanning it opens that order in the protected staff/owner workspace.
 - Owner workspace: dashboard, product editor, archive/restore, inventory movement ledger, low-stock alerts, detailed audit log, preset or custom-date sales reports, filtered CSV export, staff management and settings.
 - Staff workspace: order queue, status updates, finished-product restocking, inventory monitoring and daily sales report.
-- Firebase email/password login with a one-time Gmail sign-in link on every Firebase login, required email verification for new accounts, password-reset emails, and protected role-based workspaces.
+- Firebase email/password login with required one-time email verification for new accounts, password-reset emails, and protected role-based workspaces.
 - Store location preview and one-click Google Maps directions based on the address in Settings.
 - Role-aware return-to-workspace navigation from the storefront and safe modals that do not dismiss on outside clicks.
 - Light/dark themes, responsive layouts and temporary food images.
@@ -51,17 +51,17 @@ The app is prepared for Firebase Authentication and Cloud Firestore. When the si
 
 The app retains a local preview fallback when Firebase variables are not available. Preview workspaces intentionally bypass login. Favorites and cart state remain browser-local for now.
 
-In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. New customer, staff and owner accounts must verify their email first. After the password and role are checked, every login sends a single-use Firebase sign-in link to that email. Opening the link completes the session; opening it on another device asks for the matching email without putting the address in the link. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
+In the deployed Firebase build, Staff and Owner workspaces require a real signed-in profile; preview-role shortcuts are disabled. New customer, staff and owner accounts must verify their email once. After verification, the correct email, password and selected role create the session directly without sending another sign-in link. Product IDs, stock, supplier/category matching, and store settings are validated before saving.
 
 Google and Facebook are also supported as Firebase social sign-in providers. A first-time social user is always created as a customer; social login can never assign a staff or owner role. Existing staff and owner users must first sign in with their current method and connect Google or Facebook from **My Profile -> Connected accounts**. Google sign-in is configured by `firebase.json`. Facebook requires a one-time Meta app setup before its button can complete login.
 
 The default deployment is intentionally compatible with Firebase's free Spark plan. It uses Firebase Hosting, Authentication and Cloud Firestore. Manual GCash verification is protected by Firestore roles and updates the customer view in real time. Product images use bundled assets or a hosted image URL; Firebase Storage uploads and Cloud Functions remain disabled so the project does not require a billing account. The Spark-compatible rules also protect append-only inventory movements and owner/staff audit records.
 
-Order-confirmation and order-status emails are not active yet. Firebase currently sends account-verification, one-time sign-in and password-reset emails. A separate mail provider and a trusted server/Cloud Function are still required for order emails so provider credentials are never exposed in the browser. The project also does not currently run a separate Laravel/REST backend; Firebase Authentication and Cloud Firestore are its active application APIs.
+Order-confirmation and order-status emails are not active yet. Firebase currently sends account-verification and password-reset emails. A separate mail provider and a trusted server/Cloud Function are still required for order emails so provider credentials are never exposed in the browser. The project also does not currently run a separate Laravel/REST backend; Firebase Authentication and Cloud Firestore are its active application APIs.
 
-### Gmail verification and one-time sign-in links
+### Email verification and password login
 
-In **Firebase Console → Authentication → Sign-in method → Email/Password**, keep Email/Password enabled and enable **Email link (passwordless sign-in)**. Both deployed domains must appear in **Authentication → Settings → Authorized domains**:
+In **Firebase Console → Authentication → Sign-in method → Email/Password**, keep Email/Password enabled. New accounts receive a verification email once; verified users then sign in normally with their password. Both deployed domains must appear in **Authentication → Settings → Authorized domains**:
 
 - `tita-mars-system-202609.web.app`
 - `sych-13.github.io`

@@ -11,33 +11,19 @@ import {
   createUserWithEmailAndPassword,
   FacebookAuthProvider,
   GoogleAuthProvider,
-  isSignInWithEmailLink,
   linkWithPopup,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signOut as signOutFromFirebase,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { getAccounts, hashPassword, saveAccount } from "../utils/accounts";
-import {
-  createLoginVerificationSession,
-  firebaseAuth,
-  firebaseConfigured,
-  firestore,
-} from "../lib/firebase";
-import {
-  clearPendingEmailLogin,
-  emailActionUrl,
-  normalizeEmail,
-  readPendingEmailLogin,
-  safeDestination,
-  savePendingEmailLogin,
-} from "../utils/emailAuth";
+import { firebaseAuth, firebaseConfigured, firestore } from "../lib/firebase";
+import { emailActionUrl, normalizeEmail } from "../utils/emailAuth";
 import { readStorage, writeStorage } from "../utils/storage";
 
 const SessionContext = createContext();
@@ -75,11 +61,6 @@ const messageForAuthError = (error, fallback) => {
       return "The sign-in window was closed before login was completed.";
     case "auth/unauthorized-domain":
       return "This website domain is not authorized in Firebase Authentication.";
-    case "auth/expired-action-code":
-      return "This email sign-in link has expired. Please request a new one.";
-    case "auth/invalid-action-code":
-    case "auth/invalid-email-link":
-      return "This email sign-in link is invalid or has already been used.";
     case "permission-denied":
     case "firestore/permission-denied":
       return "Your account does not have permission for that action.";
@@ -201,21 +182,20 @@ export function SessionProvider({ children }) {
   const login = useCallback(
     async (email, password, selectedRole) => {
       if (firebaseConfigured && firebaseAuth && firestore) {
-        let verificationSession;
+        let credential;
+        authFlowInProgress.current = true;
         try {
           const normalizedEmail = normalizeEmail(email);
-          verificationSession = await createLoginVerificationSession(
+          credential = await signInWithEmailAndPassword(
+            firebaseAuth,
             normalizedEmail,
             password,
           );
           const profileSnapshot = await getDoc(
-            doc(
-              verificationSession.firestore,
-              "profiles",
-              verificationSession.user.uid,
-            ),
+            doc(firestore, "profiles", credential.user.uid),
           );
           if (!profileSnapshot.exists()) {
+            await signOutFromFirebase(firebaseAuth);
             return {
               ok: false,
               error:
@@ -223,22 +203,25 @@ export function SessionProvider({ children }) {
             };
           }
           const account = profileFor(
-            verificationSession.user,
+            credential.user,
             profileSnapshot.data(),
           );
           if (!account.active) {
+            await signOutFromFirebase(firebaseAuth);
             return { ok: false, error: "This account is currently inactive." };
           }
           if (account.role !== selectedRole) {
+            await signOutFromFirebase(firebaseAuth);
             return {
               ok: false,
               error: `This email is registered as ${account.role}, not ${selectedRole}.`,
             };
           }
-          if (!verificationSession.user.emailVerified) {
-            await sendEmailVerification(verificationSession.user, {
+          if (!credential.user.emailVerified) {
+            await sendEmailVerification(credential.user, {
               url: actionUrl(`login?role=${account.role}&verified=1`),
             });
+            await signOutFromFirebase(firebaseAuth);
             return {
               ok: true,
               emailVerificationSent: true,
@@ -246,36 +229,23 @@ export function SessionProvider({ children }) {
             };
           }
 
-          await sendSignInLinkToEmail(
-            verificationSession.auth,
-            normalizedEmail,
-            {
-              url: actionUrl("verify-email"),
-              handleCodeInApp: true,
-            },
-          );
-          savePendingEmailLogin({
-            email: normalizedEmail,
-            role: account.role,
-            next: safeDestination(
-              new URLSearchParams(window.location.hash.split("?")[1] || "").get(
-                "next",
-              ),
-              account.role,
-            ),
-          });
-          return {
-            ok: true,
-            emailLoginSent: true,
-            email: normalizedEmail,
-          };
+          setUser(account);
+          setAuthProviders(providerIdsFor(credential.user));
+          setDemoRole(account.role);
+          setReady(true);
+          return { ok: true, account };
         } catch (error) {
+          if (
+            credential?.user &&
+            firebaseAuth.currentUser?.uid === credential.user.uid
+          )
+            await signOutFromFirebase(firebaseAuth).catch(() => {});
           return {
             ok: false,
             error: messageForAuthError(error, "Unable to sign in. Please try again."),
           };
         } finally {
-          await verificationSession?.finish().catch(() => {});
+          authFlowInProgress.current = false;
         }
       }
 
@@ -456,67 +426,6 @@ export function SessionProvider({ children }) {
     }
   }, []);
 
-  const completeEmailLogin = useCallback(async (email, link) => {
-    if (!firebaseConfigured || !firebaseAuth || !firestore)
-      return {
-        ok: false,
-        error: "Email verification is available in the Firebase version.",
-      };
-    if (!isSignInWithEmailLink(firebaseAuth, link))
-      return {
-        ok: false,
-        error: "This is not a valid Tita Mars email sign-in link.",
-      };
-
-    const normalizedEmail = normalizeEmail(email);
-    if (!normalizedEmail)
-      return { ok: false, error: "Enter the email that received this link." };
-    try {
-      const pending = readPendingEmailLogin();
-      const credential = await signInWithEmailLink(
-        firebaseAuth,
-        normalizedEmail,
-        link,
-      );
-      const profileSnapshot = await getDoc(
-        doc(firestore, "profiles", credential.user.uid),
-      );
-      if (!profileSnapshot.exists()) {
-        await signOutFromFirebase(firebaseAuth);
-        return {
-          ok: false,
-          error: "This account has no Tita Mars profile.",
-        };
-      }
-      const account = profileFor(credential.user, profileSnapshot.data());
-      if (!account.active || (pending?.role && pending.role !== account.role)) {
-        await signOutFromFirebase(firebaseAuth);
-        return {
-          ok: false,
-          error: !account.active
-            ? "This account is currently inactive."
-            : "This email link does not match the selected account type.",
-        };
-      }
-      clearPendingEmailLogin();
-      setUser(account);
-      setDemoRole(account.role);
-      return {
-        ok: true,
-        account,
-        next: safeDestination(pending?.next, account.role),
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        error: messageForAuthError(
-          error,
-          "Unable to verify this email link. Please request a new one.",
-        ),
-      };
-    }
-  }, []);
-
   const resetPassword = useCallback(async (email) => {
     const normalizedEmail = email?.trim().toLowerCase();
     if (!normalizedEmail)
@@ -605,19 +514,12 @@ export function SessionProvider({ children }) {
       updateProfile,
       linkSocialProvider,
       resetPassword,
-      completeEmailLogin,
-      pendingEmailLogin: readPendingEmailLogin(),
-      isEmailLoginLink:
-        firebaseConfigured && firebaseAuth
-          ? isSignInWithEmailLink(firebaseAuth, window.location.href)
-          : false,
       setRole: (next) => {
         if (firebaseConfigured) return;
         setUser(null);
         setDemoRole(next);
       },
       signOut: () => {
-        clearPendingEmailLogin();
         if (firebaseConfigured && firebaseAuth)
           signOutFromFirebase(firebaseAuth).catch(() => {});
         setUser(null);
@@ -632,7 +534,6 @@ export function SessionProvider({ children }) {
         : getAccounts().some((account) => account.role === "owner"),
     }),
     [
-      completeEmailLogin,
       authProviders,
       linkSocialProvider,
       login,
