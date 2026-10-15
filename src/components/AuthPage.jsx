@@ -307,7 +307,10 @@ export default function AuthPage({ mode = "login" }) {
           </button>
         </form>}
         {!emailStep && !signup && !setup && (
-          <a className="auth-forgot" href="#forgot-password">
+          <a
+            className="auth-forgot"
+            href={`#forgot-password?${new URLSearchParams({ role: accountRole })}`}
+          >
             Forgot Password?
           </a>
         )}
@@ -343,6 +346,11 @@ export default function AuthPage({ mode = "login" }) {
 
 export function ForgotPassword() {
   const { resetPassword, usingFirebase } = useSession();
+  const { params } = useHashRoute();
+  const accountRole = ["staff", "owner"].includes(params.role)
+    ? params.role
+    : "customer";
+  const loginHref = `#login?${new URLSearchParams({ role: accountRole })}`;
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -357,43 +365,108 @@ export function ForgotPassword() {
     else setError(result.error);
   };
   return (
-    <section className="page-section container narrow-page">
-      <div className="simple-card">
-        <Icon name="lock" size={36} />
-        <h1>Forgot your password?</h1>
-        {sent ? (
-          <p role="status">
-            If an account exists for <strong>{email.trim()}</strong>, Firebase
-            has sent its password-reset instructions. Check the inbox and spam
-            folder.
+    <section className="password-reset-page container">
+      <div className="password-reset-story">
+        <img src={assetUrl("hero-food.png")} alt="A freshly prepared Filipino meal" />
+        <div className="password-reset-story-content">
+          <span className="password-reset-pill">
+            <Icon name="shield" size={16} weight="fill" /> Secure account recovery
+          </span>
+          <h2>
+            Back to your favorites in just a few clicks.
+          </h2>
+          <p>
+            We will send a secure reset link to the email connected to your
+            Tita Mars account.
           </p>
-        ) : (
-          <>
+          <ul>
+            <li><Icon name="check" size={16} /> One secure email link</li>
+            <li><Icon name="check" size={16} /> No account details are displayed</li>
+            <li><Icon name="check" size={16} /> Works for every account role</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="password-reset-card">
+        <BrandMark href="#home" />
+        {sent ? (
+          <div className="password-reset-success" role="status" aria-live="polite">
+            <span className="password-reset-icon success">
+              <Icon name="email" size={27} weight="fill" />
+            </span>
+            <p className="eyebrow">Reset email requested</p>
+            <h1>Check your inbox</h1>
             <p>
-              Enter the email used for your Customer, Staff, or Owner account.
+              If an account exists for this email, we sent a secure password
+              reset link.
+            </p>
+            <strong className="password-reset-email">{email.trim().toLowerCase()}</strong>
+            <div className="password-reset-tip">
+              <Icon name="clock" size={19} />
+              <span>
+                It may take a few minutes. Check your Spam or Promotions folder
+                if you do not see it.
+              </span>
+            </div>
+            <a className="btn-brand full-button" href={loginHref}>
+              Return to login <Icon name="arrow" size={16} />
+            </a>
+            <button
+              type="button"
+              className="text-link password-reset-another"
+              onClick={() => {
+                setSent(false);
+                setError("");
+              }}
+            >
+              Use another email address
+            </button>
+          </div>
+        ) : (
+          <div className="password-reset-form-wrap">
+            <a className="password-reset-back" href={loginHref}>
+              <Icon name="back" size={16} /> Back to login
+            </a>
+            <span className="password-reset-icon">
+              <Icon name="lock" size={27} weight="fill" />
+            </span>
+            <p className="eyebrow">Account recovery</p>
+            <h1>Forgot your password?</h1>
+            <p className="password-reset-intro">
+              Enter the email used for your {accountRole} account and we will
+              send you a secure reset link.
             </p>
             <form onSubmit={submit}>
               <label>
                 Email address
-                <input
-                  required
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                />
+                <span className="password-reset-field">
+                  <Icon name="email" size={19} />
+                  <input
+                    required
+                    autoFocus
+                    type="email"
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setError("");
+                    }}
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="you@example.com"
+                  />
+                </span>
               </label>
               {error && (
                 <p className="form-error" role="alert">
-                  {error}
+                  <Icon name="warning" size={16} /> {error}
                 </p>
               )}
               <button
+                type="submit"
                 className="btn-brand full-button"
                 disabled={busy || !usingFirebase}
               >
-                {busy ? "Sending…" : "Send reset email"}
+                {busy ? "Sending…" : "Send reset link"}
                 <Icon name="arrow" size={16} />
               </button>
             </form>
@@ -402,11 +475,14 @@ export function ForgotPassword() {
                 Password reset email requires the Firebase version of the app.
               </p>
             )}
-          </>
+            <div className="password-reset-assurance">
+              <Icon name="shield" size={18} />
+              <span>
+                For your privacy, we do not reveal whether an email is registered.
+              </span>
+            </div>
+          </div>
         )}
-        <a className="btn-brand" href="#login">
-          Back to login <Icon name="arrow" size={16} />
-        </a>
       </div>
     </section>
   );
