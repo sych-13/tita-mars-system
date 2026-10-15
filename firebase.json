@@ -13,6 +13,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
+    "site": "titamarsstore",
     "public": "dist",
     "ignore": [
       "firebase.json",

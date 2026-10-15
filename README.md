@@ -4,7 +4,7 @@ Responsive React/Vite storefront and owner/staff workspace based on the supplied
 
 Live deployments:
 
-- Firebase Hosting: https://tita-mars-system-202609.web.app
+- Firebase Hosting: https://titamarsstore.web.app
 - GitHub Pages: https://sych-13.github.io/tita-mars-system/
 
 ## Run locally
@@ -63,7 +63,7 @@ Order-confirmation and order-status emails are not active yet. Firebase currentl
 
 In **Firebase Console → Authentication → Sign-in method → Email/Password**, keep Email/Password enabled. New accounts receive a verification email once; verified users then sign in normally with their password. Both deployed domains must appear in **Authentication → Settings → Authorized domains**:
 
-- `tita-mars-system-202609.web.app`
+- `titamarsstore.web.app`
 - `sych-13.github.io`
 
 These settings are already active in the current Firebase project. Add `localhost` manually only for temporary local Firebase testing; it is not required by the isolated browser QA suite.
