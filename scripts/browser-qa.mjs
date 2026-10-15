@@ -276,8 +276,8 @@ try {
   fill('[name="confirm"]', "QaOnly-2026!");
   click('.auth-card form button[type="submit"], .auth-card form>.btn-brand');
   pause();
-  assert.equal(evaluate("location.hash"), "#owner");
-  pass("First owner setup and role navigation");
+  assert.equal(evaluate("location.hash"), "#home");
+  pass("First owner setup returns to the storefront home");
 
   for (const viewport of [["390", "844"], ["768", "1024"]]) {
     call("set", "viewport", ...viewport);

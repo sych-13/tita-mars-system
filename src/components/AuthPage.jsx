@@ -43,21 +43,13 @@ export default function AuthPage({ mode = "login" }) {
           ? "Admin Login"
           : "Welcome Back!";
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-  const destinationFor = (account) =>
-    account.role === "owner"
-      ? "owner"
-      : account.role === "staff"
-        ? "staff"
-        : "home";
+  const destinationFor = () => "home";
 
   const continueWithSocial = async (provider) => {
     setError("");
     setSocialBusy(provider);
     try {
-      const result = await loginWithSocial(
-        provider,
-        signup ? "customer" : accountRole,
-      );
+      const result = await loginWithSocial(provider);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -209,8 +201,8 @@ export default function AuthPage({ mode = "login" }) {
             </button>
             {!signup && accountRole !== "customer" && (
               <small className="social-role-note">
-                Use a social account already connected to this {accountRole}
-                profile.
+                Connected {accountRole} accounts keep their assigned role. A
+                new social account starts as a customer.
               </small>
             )}
             <div className="auth-divider" aria-hidden="true">

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   clearPendingEmailLogin,
+  destinationForRole,
   emailActionUrl,
   normalizeEmail,
   readPendingEmailLogin,
@@ -47,8 +48,11 @@ test("pending email-login state can be saved, read, and cleared", () => {
 });
 
 test("email callbacks only continue to safe in-app destinations", () => {
+  assert.equal(destinationForRole("customer"), "home");
+  assert.equal(destinationForRole("staff"), "home");
+  assert.equal(destinationForRole("owner"), "home");
   assert.equal(safeDestination("my-orders", "customer"), "my-orders");
   assert.equal(safeDestination("product?id=TM-EAT-001", "customer"), "product?id=TM-EAT-001");
-  assert.equal(safeDestination("https://malicious.example", "owner"), "owner");
-  assert.equal(safeDestination("//malicious.example", "staff"), "staff");
+  assert.equal(safeDestination("https://malicious.example", "owner"), "home");
+  assert.equal(safeDestination("//malicious.example", "staff"), "home");
 });

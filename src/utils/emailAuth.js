@@ -10,9 +10,7 @@ export function emailActionUrl(route, origin, baseUrl) {
   return url.toString();
 }
 
-export function destinationForRole(role) {
-  if (role === "owner") return "owner";
-  if (role === "staff") return "staff";
+export function destinationForRole() {
   return "home";
 }
 
