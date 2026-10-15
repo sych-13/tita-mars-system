@@ -29,6 +29,7 @@ import LogoutPage from "./components/LogoutPage";
 import Icon from "./components/Icon";
 import { ActivityProvider } from "./context/ActivityContext";
 import ActivityLogPage from "./components/ActivityLogPage";
+import SessionTimeoutWarning from "./components/SessionTimeoutWarning";
 
 function CustomerPage({ children }) {
   return <CustomerLayout>{children}</CustomerLayout>;
@@ -262,6 +263,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <SessionProvider>
+        <SessionTimeoutWarning />
         <ActivityProvider>
           <ShopProvider>
             <ProductProvider>

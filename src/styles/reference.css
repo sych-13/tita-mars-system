@@ -1860,6 +1860,24 @@ textarea {
   color: var(--muted-text-color);
   margin: 15px 0;
 }
+.auth-session-expired {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 2px;
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border-radius: 9px;
+  padding: 11px 12px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-color));
+  color: var(--warning);
+  text-align: left !important;
+  font-size: 11px !important;
+  line-height: 1.45;
+}
+.auth-session-expired svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
 .auth-switch {
   margin: 18px 0 13px;
 }
@@ -2382,6 +2400,54 @@ textarea {
 .tm-modal form {
   display: grid;
   gap: 15px;
+}
+.session-timeout-modal {
+  width: min(470px, calc(100vw - 28px));
+}
+.session-timeout-content {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.session-timeout-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 2px 0 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface-color));
+  color: var(--warning);
+}
+.session-timeout-content > p {
+  max-width: 370px;
+  margin: 0;
+  font-size: 12px;
+}
+.session-timeout-countdown {
+  margin: 15px 0 10px;
+  color: var(--primary-orange-hover);
+  font-family: var(--font-display);
+  font-size: 38px;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.session-timeout-content > small {
+  max-width: 370px;
+  color: var(--muted-text-color);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.session-timeout-actions {
+  display: grid;
+  width: 100%;
+  margin-top: 22px;
+}
+.session-timeout-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .toast-message {
   position: fixed;

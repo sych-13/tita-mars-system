@@ -25,6 +25,7 @@ import { getAccounts, hashPassword, saveAccount } from "../utils/accounts";
 import { firebaseAuth, firebaseConfigured, firestore } from "../lib/firebase";
 import { emailActionUrl, normalizeEmail } from "../utils/emailAuth";
 import { readStorage, writeStorage } from "../utils/storage";
+import { sessionIdleState } from "../utils/sessionTimeout";
 
 const SessionContext = createContext();
 const SESSION_KEY = "tita-mars-session";
@@ -103,6 +104,9 @@ const providerIdsFor = (authUser) =>
 
 export function SessionProvider({ children }) {
   const authFlowInProgress = useRef(false);
+  const idleLastActivity = useRef(Date.now());
+  const idleActivityThrottle = useRef(0);
+  const idleLogoutStarted = useRef(false);
   const [user, setUser] = useState(() => {
     if (firebaseConfigured) return null;
     const saved = readStorage(SESSION_KEY, null);
@@ -117,7 +121,102 @@ export function SessionProvider({ children }) {
   );
   const [ready, setReady] = useState(!firebaseConfigured);
   const [authProviders, setAuthProviders] = useState([]);
+  const [sessionWarningSeconds, setSessionWarningSeconds] = useState(null);
   const role = user?.role || (firebaseConfigured ? "customer" : demoRole);
+
+  const staySignedIn = useCallback(() => {
+    idleLastActivity.current = Date.now();
+    idleActivityThrottle.current = idleLastActivity.current;
+    setSessionWarningSeconds(null);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    idleLogoutStarted.current = true;
+    setSessionWarningSeconds(null);
+    if (firebaseConfigured && firebaseAuth)
+      await signOutFromFirebase(firebaseAuth).catch(() => {});
+    setUser(null);
+    setDemoRole("customer");
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      idleLogoutStarted.current = false;
+      setSessionWarningSeconds(null);
+      return undefined;
+    }
+
+    idleLogoutStarted.current = false;
+    staySignedIn();
+    const activeRole = role;
+
+    const expireSession = () => {
+      if (idleLogoutStarted.current) return;
+      idleLogoutStarted.current = true;
+      setSessionWarningSeconds(null);
+      const query = new URLSearchParams({
+        role: activeRole,
+        reason: "timeout",
+      }).toString();
+      void signOut().finally(() => {
+        window.location.hash = `login?${query}`;
+      });
+    };
+
+    const checkSession = () => {
+      const state = sessionIdleState(
+        activeRole,
+        idleLastActivity.current,
+      );
+      if (state.timedOut) {
+        expireSession();
+        return;
+      }
+      setSessionWarningSeconds(state.warningSeconds);
+    };
+
+    const recordActivity = () => {
+      if (idleLogoutStarted.current) return;
+      const now = Date.now();
+      if (now - idleActivityThrottle.current < 750) return;
+      idleLastActivity.current = now;
+      idleActivityThrottle.current = now;
+      setSessionWarningSeconds(null);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const state = sessionIdleState(
+        activeRole,
+        idleLastActivity.current,
+      );
+      if (state.timedOut) expireSession();
+      else recordActivity();
+    };
+
+    const activityEvents = [
+      "mousemove",
+      "pointerdown",
+      "keydown",
+      "touchstart",
+      "scroll",
+      "hashchange",
+    ];
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, recordActivity, { passive: true }),
+    );
+    document.addEventListener("visibilitychange", handleVisibility);
+    const timer = window.setInterval(checkSession, 1000);
+    checkSession();
+
+    return () => {
+      window.clearInterval(timer);
+      activityEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, recordActivity),
+      );
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [role, signOut, staySignedIn, user?.id]);
 
   useEffect(() => {
     if (!firebaseConfigured || !firebaseAuth || !firestore) return undefined;
@@ -514,17 +613,14 @@ export function SessionProvider({ children }) {
       updateProfile,
       linkSocialProvider,
       resetPassword,
+      sessionWarningSeconds,
+      staySignedIn,
       setRole: (next) => {
         if (firebaseConfigured) return;
         setUser(null);
         setDemoRole(next);
       },
-      signOut: () => {
-        if (firebaseConfigured && firebaseAuth)
-          signOutFromFirebase(firebaseAuth).catch(() => {});
-        setUser(null);
-        setDemoRole("customer");
-      },
+      signOut,
       refreshUser: async (id) => {
         if (firebaseConfigured || !id) return;
         setUser(getAccounts().find((entry) => entry.id === id) || null);
@@ -542,7 +638,10 @@ export function SessionProvider({ children }) {
       register,
       resetPassword,
       role,
+      sessionWarningSeconds,
+      signOut,
       setupOwner,
+      staySignedIn,
       updateProfile,
       user,
     ],

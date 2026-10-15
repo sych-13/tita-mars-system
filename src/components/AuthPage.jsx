@@ -126,6 +126,12 @@ export default function AuthPage({ mode = "login" }) {
             ? "A little closer to your next favorite meal."
             : "Your favorites are waiting for you."}
         </p>
+        {!signup && !setup && params.reason === "timeout" && (
+          <p className="auth-session-expired" role="status">
+            <Icon name="clock" size={17} weight="fill" />
+            Your session expired due to inactivity. Please sign in again.
+          </p>
+        )}
         {!signup && !setup && (
           <div className="role-tabs">
             {[
