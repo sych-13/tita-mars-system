@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import {
+  firebaseAuth,
   firebaseConfigured,
   firebaseFunctions,
   firestore,
@@ -116,6 +117,14 @@ const orderError = (error, fallback) => {
     return "Your account does not have permission for that order action.";
   return error?.message || fallback;
 };
+
+const canRetryWithFreshAuth = (error) =>
+  [
+    "permission-denied",
+    "firestore/permission-denied",
+    "unauthenticated",
+    "firestore/unauthenticated",
+  ].includes(error?.code);
 
 export function OrdersProvider({ children }) {
   const { deductInventory, validateOrderItems } = useProducts();
@@ -454,7 +463,8 @@ export function OrdersProvider({ children }) {
           }
         }
         try {
-          await runTransaction(firestore, async (transaction) => {
+          const persistStatusUpdate = () =>
+            runTransaction(firestore, async (transaction) => {
             const orderRef = doc(firestore, "orders", id);
             const orderSnapshot = await transaction.get(orderRef);
             if (!orderSnapshot.exists()) throw new Error("Order not found.");
@@ -544,8 +554,23 @@ export function OrdersProvider({ children }) {
               });
               changes.inventoryDeductedAt = timestamp;
             }
-            transaction.update(orderRef, changes);
-          });
+              transaction.update(orderRef, changes);
+              return normalizeOrder({ ...current, ...changes });
+            });
+          let updatedOrder;
+          try {
+            updatedOrder = await persistStatusUpdate();
+          } catch (error) {
+            if (!canRetryWithFreshAuth(error) || !firebaseAuth?.currentUser)
+              throw error;
+            await firebaseAuth.currentUser.getIdToken(true);
+            updatedOrder = await persistStatusUpdate();
+          }
+          commitOrders((current) =>
+            current.map((order) =>
+              order.id === id ? updatedOrder : order,
+            ),
+          );
           await logActivity({
             action: "update_order_status",
             entityType: "order",

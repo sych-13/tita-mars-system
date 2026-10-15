@@ -10,6 +10,7 @@ import {
 import {
   doc,
   getDoc,
+  runTransaction,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -264,6 +265,95 @@ test("staff can follow order status transitions but cannot skip or edit totals",
     }),
   );
   await assertFails(updateDoc(orderRef, { status: "Confirmed", updatedAt: iso(5) }));
+});
+
+test("staff can complete a multi-item pickup and deduct every product atomically", async () => {
+  const itemIds = Array.from({ length: 14 }, (_, index) =>
+    `ITEM-${String(index + 1).padStart(2, "0")}`,
+  );
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await Promise.all(
+      itemIds.map((id) => setDoc(doc(db, `products/${id}`), product(id))),
+    );
+    await setDoc(
+      doc(db, "orders/multi-item-pickup"),
+      order("multi-item-pickup", "customer-a", {
+        status: "Ready for Pickup",
+        items: itemIds.map((id) => ({
+          id,
+          name: id,
+          price: 70,
+          quantity: 1,
+        })),
+        subtotal: 980,
+        total: 980,
+        statusHistory: [
+          {
+            status: "Ready for Pickup",
+            at: iso(3),
+            actorId: "staff-1",
+            actorName: "Staff",
+            actorRole: "staff",
+          },
+        ],
+      }),
+    );
+  });
+
+  const db = verifiedContext("staff-1").firestore();
+  const orderRef = doc(db, "orders/multi-item-pickup");
+  await assertSucceeds(
+    runTransaction(db, async (transaction) => {
+      const orderSnapshot = await transaction.get(orderRef);
+      const current = orderSnapshot.data();
+      const productRefs = itemIds.map((id) => doc(db, `products/${id}`));
+      const productSnapshots = await Promise.all(
+        productRefs.map((productRef) => transaction.get(productRef)),
+      );
+      productSnapshots.forEach((snapshot, index) => {
+        const productRef = productRefs[index];
+        const productData = snapshot.data();
+        transaction.update(productRef, {
+          stock: 19,
+          available: true,
+          updatedAt: iso(4),
+        });
+        transaction.set(doc(db, `inventoryMovements/deduct-${index}`), {
+          id: `deduct-${index}`,
+          productId: productRef.id,
+          productName: productData.name,
+          supplier: productData.supplier,
+          type: "order_deduction",
+          quantity: -1,
+          beforeStock: 20,
+          afterStock: 19,
+          orderId: "multi-item-pickup",
+          orderNumber: "TM-MULTI-ITEM-PICKUP",
+          reason: "Completed order TM-MULTI-ITEM-PICKUP",
+          actorId: "staff-1",
+          actorName: "Staff",
+          actorRole: "staff",
+          createdAt: iso(4),
+        });
+      });
+      transaction.update(orderRef, {
+        status: "Completed",
+        updatedAt: iso(4),
+        inventoryDeductedAt: iso(4),
+        statusHistory: [
+          ...current.statusHistory,
+          {
+            status: "Completed",
+            at: iso(4),
+            actorId: "staff-1",
+            actorName: "Staff",
+            actorRole: "staff",
+          },
+        ],
+      });
+    }),
+  );
 });
 
 test("staff can verify only GCash payments and customers cannot self-verify", async () => {

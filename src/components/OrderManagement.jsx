@@ -23,6 +23,7 @@ export default function OrderManagement({ role = "owner" }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState("");
   const [paymentUpdating, setPaymentUpdating] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const visible = orders.filter(
@@ -35,19 +36,23 @@ export default function OrderManagement({ role = "owner" }) {
   const current = orders.find((o) => o.id === params.order);
   useEffect(() => {
     setStatus(current?.status || "");
+    setUpdateError("");
   }, [current?.id, current?.status]);
   const close = () => navigate("manage-orders");
   const open = (o) => {
     setStatus(o.status);
+    setUpdateError("");
     navigate("manage-orders", { order: o.id });
   };
   const update = async () => {
     const next = status || current.status;
+    setUpdateError("");
     setUpdating(true);
     const result = await updateOrderStatus(current.id, next);
     setUpdating(false);
     notify(result.ok ? `${current.number} updated to ${next}.` : result.error);
     if (result.ok) close();
+    else setUpdateError(result.error || "Unable to update this order.");
   };
   const updatePayment = async () => {
     const next =
@@ -309,7 +314,10 @@ export default function OrderManagement({ role = "owner" }) {
             <select
               value={status || current.status}
               disabled={["Completed", "Cancelled"].includes(current.status)}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setUpdateError("");
+              }}
             >
               {statusChangesForOrder(current).map((s) => (
                 <option key={s}>{s}</option>
@@ -336,19 +344,26 @@ export default function OrderManagement({ role = "owner" }) {
               Cancelled · No inventory was deducted.
             </p>
           ) : (
-            <button
-              className="btn-brand full-button"
-              style={{ marginTop: 17 }}
-              onClick={update}
-              disabled={updating || status === current.status}
-            >
+            <>
+              {updateError && (
+                <p className="form-error" role="alert">
+                  {updateError}
+                </p>
+              )}
+              <button
+                className="btn-brand full-button"
+                style={{ marginTop: 17 }}
+                onClick={update}
+                disabled={updating || status === current.status}
+              >
               {updating
                 ? "Updating…"
                 : status === current.status
                   ? "Select next status"
                   : "Update Status"}{" "}
-              <Icon name="check" size={17} />
-            </button>
+                <Icon name="check" size={17} />
+              </button>
+            </>
           )}
         </Modal>
       )}
