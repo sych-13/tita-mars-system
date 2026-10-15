@@ -92,9 +92,7 @@ const socialProvider = (providerName) => {
     return provider;
   }
   if (providerName === "facebook") {
-    const provider = new FacebookAuthProvider();
-    provider.addScope("email");
-    return provider;
+    return new FacebookAuthProvider();
   }
   throw new Error("Unsupported social sign-in provider.");
 };
