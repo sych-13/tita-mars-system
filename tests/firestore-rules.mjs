@@ -12,6 +12,7 @@ import {
   getDoc,
   runTransaction,
   setDoc,
+  Timestamp,
   updateDoc,
 } from "firebase/firestore";
 
@@ -336,6 +337,86 @@ test("staff can complete a multi-item pickup and deduct every product atomically
           actorRole: "staff",
           createdAt: iso(4),
         });
+      });
+      transaction.update(orderRef, {
+        status: "Completed",
+        updatedAt: iso(4),
+        inventoryDeductedAt: iso(4),
+        statusHistory: [
+          ...current.statusHistory,
+          {
+            status: "Completed",
+            at: iso(4),
+            actorId: "staff-1",
+            actorName: "Staff",
+            actorRole: "staff",
+          },
+        ],
+      });
+    }),
+  );
+});
+
+test("staff can complete orders backed by timestamp-dated catalog products", async () => {
+  const catalogTimestamp = Timestamp.fromDate(new Date(iso()));
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(
+      doc(db, "products/TME-001"),
+      product("TME-001", {
+        createdAt: catalogTimestamp,
+        updatedAt: catalogTimestamp,
+      }),
+    );
+    await setDoc(
+      doc(db, "orders/timestamp-product-order"),
+      order("timestamp-product-order", "customer-a", {
+        status: "Ready for Pickup",
+        statusHistory: [
+          {
+            status: "Ready for Pickup",
+            at: iso(3),
+            actorId: "staff-1",
+            actorName: "Staff",
+            actorRole: "staff",
+          },
+        ],
+      }),
+    );
+  });
+
+  const db = verifiedContext("staff-1").firestore();
+  const orderRef = doc(db, "orders/timestamp-product-order");
+  const productRef = doc(db, "products/TME-001");
+  await assertSucceeds(
+    runTransaction(db, async (transaction) => {
+      const [orderSnapshot, productSnapshot] = await Promise.all([
+        transaction.get(orderRef),
+        transaction.get(productRef),
+      ]);
+      const current = orderSnapshot.data();
+      const currentProduct = productSnapshot.data();
+      transaction.update(productRef, {
+        stock: currentProduct.stock - 1,
+        available: true,
+        updatedAt: iso(4),
+      });
+      transaction.set(doc(db, "inventoryMovements/timestamp-deduction"), {
+        id: "timestamp-deduction",
+        productId: "TME-001",
+        productName: currentProduct.name,
+        supplier: currentProduct.supplier,
+        type: "order_deduction",
+        quantity: -1,
+        beforeStock: currentProduct.stock,
+        afterStock: currentProduct.stock - 1,
+        orderId: "timestamp-product-order",
+        orderNumber: "TM-TIMESTAMP-PRODUCT-ORDER",
+        reason: "Completed order TM-TIMESTAMP-PRODUCT-ORDER",
+        actorId: "staff-1",
+        actorName: "Staff",
+        actorRole: "staff",
+        createdAt: iso(4),
       });
       transaction.update(orderRef, {
         status: "Completed",
