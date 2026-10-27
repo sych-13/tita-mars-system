@@ -5,9 +5,10 @@ import Icon from "./Icon";
 import { useProducts } from "../context/ProductContext";
 import { useShop } from "../context/ShopContext";
 import { useHashRoute } from "../hooks/useHashRoute";
+import { ProductGridSkeleton } from "./PageSkeleton";
 export default function ProductCatalog() {
   const { params, navigate } = useHashRoute();
-  const { products } = useProducts();
+  const { products, isLoading } = useProducts();
   const { favorites } = useShop();
   const [sort, setSort] = useState("popular");
   const query = params.q || "";
@@ -112,12 +113,16 @@ export default function ProductCatalog() {
               onChange={(e) => search(e.target.value)}
             />
           </label>
-          <div className="product-grid">
-            {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} headingLevel={2} />
-            ))}
-          </div>
-          {!filtered.length && (
+          {isLoading ? (
+            <ProductGridSkeleton />
+          ) : (
+            <div className="product-grid">
+              {filtered.map((product) => (
+                <ProductCard key={product.id} product={product} headingLevel={2} />
+              ))}
+            </div>
+          )}
+          {!isLoading && !filtered.length && (
             <div className="empty-catalog">
               <Icon name={params.favorites ? "heart" : "search"} size={42} />
               <h2>

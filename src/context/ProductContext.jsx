@@ -123,6 +123,7 @@ export function ProductProvider({ children }) {
   const { user, role } = useSession();
   const { logActivity } = useActivity();
   const [products, setProducts] = useState(getInitialProducts);
+  const [isLoading, setIsLoading] = useState(firebaseConfigured);
   const productsRef = useRef(products);
   const [inventoryMovements, setInventoryMovements] = useState(() =>
     firebaseConfigured
@@ -168,7 +169,11 @@ export function ProductProvider({ children }) {
   }, [inventoryMovements]);
 
   useEffect(() => {
-    if (!firebaseConfigured || !firestore) return undefined;
+    if (!firebaseConfigured || !firestore) {
+      setIsLoading(false);
+      return undefined;
+    }
+    setIsLoading(true);
     return onSnapshot(
       collection(firestore, "products"),
       (snapshot) => {
@@ -176,8 +181,12 @@ export function ProductProvider({ children }) {
           .map((item) => formatProduct({ id: item.id, ...item.data() }))
           .sort(compareProducts);
         commitProducts(next);
+        setIsLoading(false);
       },
-      () => commitProducts([]),
+      () => {
+        commitProducts([]);
+        setIsLoading(false);
+      },
     );
   }, [commitProducts]);
 
@@ -563,6 +572,7 @@ export function ProductProvider({ children }) {
   const value = useMemo(
     () => ({
       products,
+      isLoading,
       inventoryMovements,
       lowStockLimit: LOW_STOCK_LIMIT,
       usingFirebase: firebaseConfigured,
@@ -579,6 +589,7 @@ export function ProductProvider({ children }) {
       archiveProduct,
       deductInventory,
       products,
+      isLoading,
       restoreProduct,
       updateProduct,
       restockProduct,

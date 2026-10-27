@@ -11,8 +11,9 @@ import OrderStatusBadge from "./OrderStatusBadge";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 import PickupVerificationQr from "./PickupVerificationQr";
 import OrderReceipt from "./OrderReceipt";
+import { OrderListSkeleton } from "./PageSkeleton";
 export default function CustomerDashboard() {
-  const { orders, saveReview, submitPaymentDetails } = useOrders();
+  const { orders, isLoading, saveReview, submitPaymentDetails } = useOrders();
   const { products } = useProducts();
   const { user } = useSession();
   const { notify, settings } = useShop();
@@ -101,7 +102,7 @@ export default function CustomerDashboard() {
       </div>
       <div className="customer-order-grid">
         <div>
-          {visible.map((o) => (
+          {isLoading ? <OrderListSkeleton /> : visible.map((o) => (
             <article className="simple-card order-history-card" key={o.id}>
               <div className="order-card-top">
                 <div>
@@ -155,7 +156,7 @@ export default function CustomerDashboard() {
               )}
             </article>
           ))}
-          {!visible.length && (
+          {!isLoading && !visible.length && (
             <div className="simple-card dashboard-empty">
               <Icon name="orders" size={42} />
               <h2>
@@ -170,7 +171,15 @@ export default function CustomerDashboard() {
           )}
         </div>
         <aside>
-          {active ? (
+          {isLoading ? (
+            <div className="simple-card tracking-card skeleton-tracking-card" aria-label="Loading order tracking" aria-busy="true">
+              <span className="skeleton-block skeleton-line skeleton-line-title" />
+              <span className="skeleton-block skeleton-line skeleton-line-medium" />
+              <span className="skeleton-block skeleton-timeline" />
+              <span className="skeleton-block skeleton-timeline" />
+              <span className="skeleton-block skeleton-timeline" />
+            </div>
+          ) : active ? (
             <div className="simple-card tracking-card">
               <header className="table-toolbar">
                 <h2>Track your order</h2>

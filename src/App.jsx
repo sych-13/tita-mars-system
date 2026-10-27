@@ -30,6 +30,7 @@ import Icon from "./components/Icon";
 import { ActivityProvider } from "./context/ActivityContext";
 import ActivityLogPage from "./components/ActivityLogPage";
 import SessionTimeoutWarning from "./components/SessionTimeoutWarning";
+import PageSkeleton from "./components/PageSkeleton";
 
 function CustomerPage({ children }) {
   return <CustomerLayout>{children}</CustomerLayout>;
@@ -96,7 +97,7 @@ function NotFoundPage() {
 
 function AppViews() {
   const { route, params } = useHashRoute();
-  const { role } = useSession();
+  const { role, ready } = useSession();
   const staffRole = role === "staff" ? "staff" : "owner";
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -109,6 +110,12 @@ function AppViews() {
     );
     return () => window.clearTimeout(focusTimer);
   }, [params.order, route]);
+  if (!ready)
+    return (
+      <CustomerPage>
+        <PageSkeleton variant={route === "catalog" ? "catalog" : "page"} />
+      </CustomerPage>
+    );
   switch (route) {
     case "home":
       return (

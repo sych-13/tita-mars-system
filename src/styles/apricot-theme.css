@@ -652,3 +652,158 @@ textarea {
     color: #111;
   }
 }
+
+/* Customer-layout and loading refinements.  Kept last so these rules win over
+   the legacy reference stylesheet used by the initial prototype. */
+.customer-shell {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.customer-shell > main {
+  display: flex;
+  width: 100%;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
+.customer-shell > main > .page-section,
+.customer-shell > main > .catalog-page {
+  width: 100%;
+}
+
+@media (min-width: 1201px) {
+  .customer-shell > main .container,
+  .customer-navbar .container,
+  .site-footer .container {
+    width: min(1280px, calc(100% - 4rem));
+    max-width: none;
+  }
+}
+
+.site-footer {
+  margin-top: auto;
+  padding: clamp(2rem, 4vw, 3.4rem) 0 1.5rem;
+}
+
+.footer-content {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.45fr) repeat(3, minmax(145px, 1fr)) minmax(160px, 0.9fr);
+  align-items: center;
+  gap: clamp(1rem, 2.2vw, 2.5rem);
+}
+
+.footer-service {
+  min-width: 0;
+}
+
+.footer-service > span,
+.footer-tagline {
+  max-width: none;
+}
+
+.footer-tagline {
+  text-align: right;
+}
+
+.footer-bottom {
+  margin-top: 1.75rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.skeleton-block {
+  display: block;
+  overflow: hidden;
+  border-radius: 0.65rem;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--surface-strong) 78%, transparent) 28%,
+    color-mix(in srgb, var(--surface-color) 84%, transparent) 42%,
+    color-mix(in srgb, var(--surface-strong) 78%, transparent) 58%
+  );
+  background-size: 240% 100%;
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -160% 0;
+  }
+}
+
+.page-skeleton {
+  padding: clamp(3.8rem, 8vw, 6.6rem) 0;
+}
+
+.skeleton-page-heading {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 680px;
+  margin-bottom: 2.25rem;
+}
+
+.skeleton-line {
+  height: 0.78rem;
+}
+
+.skeleton-eyebrow { width: 7.5rem; height: 0.6rem; }
+.skeleton-page-title { width: min(100%, 24rem); height: clamp(2.5rem, 6vw, 4.4rem); }
+.skeleton-page-description { width: min(100%, 35rem); }
+.skeleton-line-short { width: 42%; height: 0.6rem; }
+.skeleton-line-title { width: 74%; height: 1.15rem; }
+.skeleton-line-medium { width: 56%; }
+.skeleton-line-price { width: 4.8rem; height: 1rem; }
+.skeleton-button { width: 100%; height: 2.3rem; margin-top: 0.2rem; }
+.skeleton-button-small { width: 7rem; }
+.skeleton-pill { width: 4.8rem; height: 1.8rem; border-radius: 999px; }
+
+.skeleton-product-card {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--surface-color);
+}
+
+.skeleton-product-image { width: 100%; height: 176px; border-radius: 0; }
+.skeleton-product-copy { display: grid; gap: 0.65rem; padding: 1rem; }
+
+.skeleton-order-list { display: grid; gap: 0.85rem; }
+.skeleton-order-card { margin: 0; padding: 1.2rem; }
+.skeleton-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.skeleton-row > div { display: grid; width: min(60%, 260px); gap: 0.55rem; }
+.skeleton-order-images { display: flex; gap: 0.55rem; margin: 1.1rem 0; }
+.skeleton-order-images .skeleton-block { width: 3rem; height: 3rem; }
+.skeleton-order-actions { border-top: 1px solid var(--border-color); padding-top: 1rem; }
+.skeleton-tracking-card { display: grid; gap: 1rem; min-height: 355px; }
+.skeleton-timeline { width: 100%; height: 2.55rem; }
+
+@media (max-width: 900px) {
+  .footer-content {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .footer-content > .brand-mark,
+  .footer-tagline {
+    grid-column: 1 / -1;
+  }
+  .footer-tagline { text-align: left; }
+}
+
+@media (max-width: 680px) {
+  .customer-shell { min-height: 100svh; }
+  .customer-shell > main { padding-bottom: 0.4rem; }
+  .site-footer { padding: 1.85rem 0 calc(5.8rem + env(safe-area-inset-bottom)); }
+  .footer-content { grid-template-columns: 1fr; gap: 1.05rem; }
+  .footer-content > .brand-mark,
+  .footer-tagline { grid-column: auto; }
+  .footer-service { padding: 0.7rem 0; border-top: 1px solid var(--border-color); }
+  .footer-bottom { align-items: flex-start; flex-direction: column; gap: 0.7rem; }
+  .page-skeleton { padding-top: 2.4rem; }
+  .skeleton-product-grid { grid-template-columns: 1fr; }
+  .skeleton-product-image { height: 190px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block { animation: none; }
+}

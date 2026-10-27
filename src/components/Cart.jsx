@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useShop } from "../context/ShopContext";
 import Icon from "./Icon";
+import { useProducts } from "../context/ProductContext";
+import { OrderListSkeleton } from "./PageSkeleton";
 
 const peso = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -13,6 +15,7 @@ export default function Cart() {
   const { items, removeItem, setQuantity, total } = useCart();
   const [announcement, setAnnouncement] = useState("");
   const { settings } = useShop();
+  const { isLoading } = useProducts();
 
   const changeQuantity = (item, requestedQuantity) => {
     const quantity = Math.min(requestedQuantity, item.stock);
@@ -46,7 +49,9 @@ export default function Cart() {
             Continue shopping <Icon name="arrow" size={16} />
           </a>
         </div>
-        {items.length === 0 ? (
+        {isLoading ? (
+          <OrderListSkeleton count={2} />
+        ) : items.length === 0 ? (
           <div className="empty-cart">
             <span className="empty-cart-icon">
               <Icon name="pickup" size={24} />

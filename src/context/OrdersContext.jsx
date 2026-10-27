@@ -128,12 +128,13 @@ const canRetryWithFreshAuth = (error) =>
 
 export function OrdersProvider({ children }) {
   const { deductInventory, validateOrderItems } = useProducts();
-  const { user, role } = useSession();
+  const { user, role, ready } = useSession();
   const { settings } = useShop();
   const { logActivity } = useActivity();
   const [orders, setOrders] = useState(() =>
     firebaseConfigured ? [] : loadLegacyOrders().map(normalizeOrder),
   );
+  const [isLoading, setIsLoading] = useState(firebaseConfigured);
   const ordersRef = useRef(orders);
 
   const commitOrders = useCallback((updater) => {
@@ -157,11 +158,16 @@ export function OrdersProvider({ children }) {
   }, [orders]);
 
   useEffect(() => {
-    if (!firebaseConfigured || !firestore) return undefined;
-    if (!user) {
-      commitOrders([]);
+    if (!firebaseConfigured || !firestore) {
+      setIsLoading(false);
       return undefined;
     }
+    if (!user) {
+      commitOrders([]);
+      setIsLoading(!ready);
+      return undefined;
+    }
+    setIsLoading(true);
     const orderCollection = collection(firestore, "orders");
     const source =
       role === "staff" || role === "owner"
@@ -177,10 +183,14 @@ export function OrdersProvider({ children }) {
               new Date(right.createdAt || 0) - new Date(left.createdAt || 0),
           );
         commitOrders(next);
+        setIsLoading(false);
       },
-      () => commitOrders([]),
+      () => {
+        commitOrders([]);
+        setIsLoading(false);
+      },
     );
-  }, [commitOrders, role, user]);
+  }, [commitOrders, ready, role, user]);
 
   const createOrder = useCallback(
     async (data) => {
@@ -870,6 +880,7 @@ export function OrdersProvider({ children }) {
   const value = useMemo(
     () => ({
       orders,
+      isLoading,
       createOrder,
       updateOrderStatus,
       updatePaymentStatus,
@@ -879,6 +890,7 @@ export function OrdersProvider({ children }) {
     [
       createOrder,
       orders,
+      isLoading,
       updateOrderStatus,
       updatePaymentStatus,
       submitPaymentDetails,
