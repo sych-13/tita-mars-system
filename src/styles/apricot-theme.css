@@ -951,6 +951,10 @@ select {
   margin: 0.35rem 0 0.1rem;
 }
 
+.about-contact-card .map-directions-link {
+  font-size: 0.96rem;
+}
+
 @media (max-width: 900px) {
   .about-grid {
     grid-template-columns: 1fr;

@@ -5,6 +5,7 @@ export default function AboutPage() {
   const { settings } = useShop();
   const mapQuery = encodeURIComponent(settings.address);
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapQuery}`;
+  const mapEmbedUrl = `https://www.google.com/maps?q=${mapQuery}&z=18&output=embed`;
   return (
     <section className="container page-section about-page">
       <div className="about-grid">
@@ -67,7 +68,7 @@ export default function AboutPage() {
           <div className="store-map">
             <iframe
               title="Tita Mars location on Google Maps"
-              src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+              src={mapEmbedUrl}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />

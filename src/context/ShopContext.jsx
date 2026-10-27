@@ -4,7 +4,7 @@ import { firebaseConfigured, firestore } from "../lib/firebase";
 import { readStorage, writeStorage } from "../utils/storage";
 import { useActivity } from "./ActivityContext";
 const ShopContext = createContext();
-const STORE_ADDRESS = "02 P. Ocampo St., Brgy. San Isidro, Taytay, Rizal";
+const STORE_ADDRESS = "2 P. Ocampo, Taytay, 1920 Rizal";
 const defaults = {
   name: "Tita Mars Eatery & Bakery",
   phone: "",
@@ -22,7 +22,12 @@ const defaults = {
 };
 const normalizeSettings = (source = {}) => {
   const next = { ...defaults, ...source };
-  if (!next.address || next.address.trim() === "Taytay, Rizal")
+  const address = String(next.address || "").trim();
+  if (
+    !address ||
+    address === "Taytay, Rizal" ||
+    address === "02 P. Ocampo St., Brgy. San Isidro, Taytay, Rizal"
+  )
     next.address = STORE_ADDRESS;
   return next;
 };
