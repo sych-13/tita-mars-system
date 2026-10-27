@@ -807,3 +807,182 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block { animation: none; }
 }
+
+/* Readable typography and the physical-store About panel. */
+body,
+button,
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+.customer-shell .eyebrow {
+  font-size: 0.78rem;
+}
+
+.customer-shell .text-link {
+  font-size: 0.92rem;
+}
+
+.customer-shell :is(.btn-brand, .btn-secondary) {
+  font-size: 0.95rem;
+}
+
+.customer-shell small,
+.customer-shell .field-help {
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.about-page {
+  padding-block: clamp(3.5rem, 7vw, 6.4rem);
+}
+
+.about-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  align-items: start;
+  gap: clamp(2rem, 5vw, 5.5rem);
+}
+
+.about-page > .about-grid > div > h1 {
+  max-width: 14ch;
+  font-size: clamp(2.9rem, 5.3vw, 5rem);
+  line-height: 1.03;
+}
+
+.about-page .page-lead {
+  max-width: 35rem;
+  margin-top: 1.2rem;
+  font-size: clamp(1.18rem, 1.8vw, 1.42rem);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.about-page > .about-grid > div > p:not(.eyebrow):not(.page-lead) {
+  max-width: 43rem;
+  margin-top: 1.4rem;
+  font-size: 1.08rem;
+  line-height: 1.75;
+}
+
+.about-points {
+  gap: 1.2rem;
+  margin-top: 2.45rem;
+}
+
+.about-points article {
+  gap: 0.95rem;
+}
+
+.about-points > article > i {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 0.9rem;
+}
+
+.about-points strong {
+  font-size: 1.04rem;
+}
+
+.about-points span {
+  margin-top: 0.3rem;
+  font-size: 0.94rem;
+  line-height: 1.58;
+}
+
+.about-contact-card {
+  gap: 0.95rem;
+  padding: clamp(1rem, 2.3vw, 1.65rem);
+}
+
+.storefront-photo {
+  position: relative;
+  margin: 0 0 0.45rem;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--radius-lg) - 0.35rem);
+  background: var(--surface-strong);
+}
+
+.storefront-photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.42 / 1;
+  object-fit: cover;
+  object-position: center;
+}
+
+.storefront-photo figcaption {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  border: 1px solid rgb(255 245 233 / 0.28);
+  border-radius: 0.65rem;
+  background: rgb(35 20 12 / 0.76);
+  color: #fff8f1;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
+  backdrop-filter: blur(8px);
+}
+
+.about-contact-card h2 {
+  margin-top: 0.2rem;
+  font-size: clamp(1.85rem, 3vw, 2.45rem);
+}
+
+.about-contact-card p {
+  margin-bottom: 0.1rem;
+  font-size: 1rem;
+  line-height: 1.62;
+}
+
+.about-contact-card .text-link {
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.store-map {
+  min-height: 235px;
+  margin: 0.35rem 0 0.1rem;
+}
+
+@media (max-width: 900px) {
+  .about-grid {
+    grid-template-columns: 1fr;
+  }
+  .about-page > .about-grid > div > h1 {
+    max-width: none;
+  }
+  .about-contact-card {
+    max-width: 720px;
+  }
+  .storefront-photo img {
+    aspect-ratio: 1.8 / 1;
+  }
+}
+
+@media (max-width: 680px) {
+  body,
+  button,
+  input,
+  textarea,
+  select {
+    font-size: 15px;
+  }
+  .customer-shell .eyebrow { font-size: 0.74rem; }
+  .customer-shell small,
+  .customer-shell .field-help { font-size: 0.78rem; }
+  .about-page { padding-block: 2.5rem 3.3rem; }
+  .about-page > .about-grid > div > h1 { font-size: clamp(2.45rem, 12vw, 3.5rem); }
+  .about-page .page-lead { font-size: 1.1rem; }
+  .about-page > .about-grid > div > p:not(.eyebrow):not(.page-lead) { font-size: 1rem; }
+  .about-points strong { font-size: 1rem; }
+  .about-points span { font-size: 0.9rem; }
+  .storefront-photo img { aspect-ratio: 1.2 / 1; }
+  .store-map { min-height: 220px; }
+}

@@ -52,11 +52,14 @@ export default function AboutPage() {
           </div>
         </div>
         <aside className="about-contact-card">
-          <img
-            src={assetUrl("hero-food.png")}
-            alt="Adobo, rice and fresh bread"
-            style={{ borderRadius: 9, width: "100%" }}
-          />
+          <figure className="storefront-photo">
+            <img
+              src={assetUrl("tita-mars-store-night.png")}
+              alt="The Tita Mars Karinderya and Sari-Sari Store at night"
+              loading="lazy"
+            />
+            <figcaption>Our Tita Mars store in Brgy. San Isidro</figcaption>
+          </figure>
           <h2>Visit Tita Mars</h2>
           <p>
             <Icon name="location" size={17} /> {settings.address}

@@ -4,11 +4,12 @@ import { firebaseConfigured, firestore } from "../lib/firebase";
 import { readStorage, writeStorage } from "../utils/storage";
 import { useActivity } from "./ActivityContext";
 const ShopContext = createContext();
+const STORE_ADDRESS = "02 P. Ocampo St., Brgy. San Isidro, Taytay, Rizal";
 const defaults = {
   name: "Tita Mars Eatery & Bakery",
   phone: "",
   email: "",
-  address: "Taytay, Rizal",
+  address: STORE_ADDRESS,
   hours: "Open 24/7",
   deliveryFee: 20,
   gcashName: "",
@@ -19,12 +20,17 @@ const defaults = {
   allowScheduledOrders: true,
   maxScheduleDays: 7,
 };
+const normalizeSettings = (source = {}) => {
+  const next = { ...defaults, ...source };
+  if (!next.address || next.address.trim() === "Taytay, Rizal")
+    next.address = STORE_ADDRESS;
+  return next;
+};
 export function ShopProvider({ children }) {
   const { logActivity } = useActivity();
-  const [settings, setSettings] = useState(() => ({
-    ...defaults,
-    ...readStorage("tita-mars-settings", {}),
-  }));
+  const [settings, setSettings] = useState(() =>
+    normalizeSettings(readStorage("tita-mars-settings", {})),
+  );
   const [favorites, setFavorites] = useState(() =>
     readStorage("tita-mars-favorites", []),
   );
@@ -35,7 +41,7 @@ export function ShopProvider({ children }) {
   useEffect(() => {
     if (!firebaseConfigured || !firestore) return undefined;
     return onSnapshot(doc(firestore, "settings", "store"), (snapshot) => {
-      if (snapshot.exists()) setSettings({ ...defaults, ...snapshot.data() });
+      if (snapshot.exists()) setSettings(normalizeSettings(snapshot.data()));
     });
   }, []);
   useEffect(() => writeStorage("tita-mars-favorites", favorites), [favorites]);
