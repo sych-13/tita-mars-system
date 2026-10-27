@@ -1,0 +1,17 @@
+{
+  "name": "Tita Mars Eatery & Bakery",
+  "short_name": "Tita Mars",
+  "description": "Freshly cooked Filipino meals and bakery favorites in Taytay, Rizal.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff8f0",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "tita-mars-favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
