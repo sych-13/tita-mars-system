@@ -59,7 +59,7 @@ export default function AboutPage() {
               alt="The Tita Mars Karinderya and Sari-Sari Store at night"
               loading="lazy"
             />
-            <figcaption>Our Tita Mars store in Brgy. San Isidro</figcaption>
+            <figcaption>Our Tita Mars store in Taytay, Rizal</figcaption>
           </figure>
           <h2>Visit Tita Mars</h2>
           <p>
