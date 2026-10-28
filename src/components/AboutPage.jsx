@@ -55,7 +55,7 @@ export default function AboutPage() {
         <aside className="about-contact-card">
           <figure className="storefront-photo">
             <img
-              src={assetUrl("tita-mars-store-night.png")}
+              src={assetUrl("tita-mars-storefront.png")}
               alt="The Tita Mars Karinderya and Sari-Sari Store at night"
               loading="lazy"
             />
