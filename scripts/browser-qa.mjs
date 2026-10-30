@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
 
 const binary = process.env.AGENT_BROWSER_BIN;
 if (!binary)
@@ -8,6 +9,8 @@ if (!binary)
   );
 const session = "tita-qa-" + Date.now();
 const base = process.env.QA_URL || "http://127.0.0.1:4173/";
+const screenshotDir = "audits/screenshots";
+mkdirSync(screenshotDir, { recursive: true });
 const call = (...args) => {
   const output = spawnSync(binary, ["--session", session, "--json", ...args], {
     encoding: "utf8",
@@ -46,7 +49,7 @@ const orders = () =>
   evaluate('JSON.parse(localStorage.getItem("tita-mars-orders-v2"))');
 const shot = (name) => {
   pause();
-  call("screenshot", "qa-" + name + ".png");
+  call("screenshot", `${screenshotDir}/qa-${name}.png`);
 };
 let checks = 0;
 const pass = (label) => {

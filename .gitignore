@@ -8,3 +8,5 @@ firestore-debug.log
 ui-debug.log
 .firebase/
 tmp/
+/audits/ui-debug-*/
+/audits/screenshots/*.png

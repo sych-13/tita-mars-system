@@ -7,11 +7,11 @@ Date: 2026-09-29
 - Source visual truth: `C:/Users/icaru/.codex/generated_images/01a09612-5d61-7231-936c-eac9ec605efd/exec-dfaa4cb6-7330-4b36-b995-16184427ff6a.png`
 - Source pixels: 1488 × 1058. The source is a single presentation image with light mode in its upper half and dark mode in its lower half.
 - Implementation screenshots:
-  - `C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/qa-apricot-light.png`
-  - `C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/qa-apricot-dark.png`
+  - `C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/audits/screenshots/qa-apricot-light.png`
+  - `C:/Users/icaru/OneDrive/Documents/ChatGPT/TITAMARS/audits/screenshots/qa-apricot-dark.png`
 - Implementation pixels and CSS viewport: 1440 × 1000 at device pixel ratio 1.
 - Route/state: customer home, light and dark themes, desktop viewport.
-- Responsive evidence: `qa-home-mobile-light.png` and `qa-home-mobile-dark.png` at 390 × 844 CSS pixels; `qa-owner-dark.png` at 1440 × 1000.
+- Responsive evidence: `audits/screenshots/qa-home-mobile-light.png` and `audits/screenshots/qa-home-mobile-dark.png` at 390 × 844 CSS pixels; `audits/screenshots/qa-owner-dark.png` at 1440 × 1000.
 - Density normalization: none required. The source composite was judged by its individual light/dark halves; the implementation modes were captured separately at device pixel ratio 1.
 
 ## Full-view comparison evidence
