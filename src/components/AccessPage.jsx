@@ -25,6 +25,7 @@ const roles = [
 ];
 export default function AccessPage() {
   const { setRole, usingFirebase } = useSession();
+  const visibleRoles = usingFirebase ? roles.filter(([role]) => role === "customer") : roles;
   return (
     <section className="container access-page">
       <header className="access-heading">
@@ -37,7 +38,7 @@ export default function AccessPage() {
         </p>
       </header>
       <div className="access-grid">
-        {roles.map(([role, label, copy, icon, destination]) => (
+        {visibleRoles.map(([role, label, copy, icon, destination]) => (
           <article className="access-card" key={role}>
             <span className="access-icon">
               <Icon name={icon} size={30} />
@@ -61,6 +62,12 @@ export default function AccessPage() {
           </article>
         ))}
       </div>
+      {usingFirebase && (
+        <p className="access-role-note" role="note">
+          Staff and Owner/Admin access is restricted to assigned accounts. Use
+          your private workspace sign-in link.
+        </p>
+      )}
     </section>
   );
 }

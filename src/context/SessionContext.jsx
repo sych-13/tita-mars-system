@@ -425,7 +425,7 @@ export function SessionProvider({ children }) {
     return result;
   }, []);
 
-  const loginWithSocial = useCallback(async (providerName) => {
+  const loginWithSocial = useCallback(async (providerName, selectedRole = "customer") => {
     if (!firebaseConfigured || !firebaseAuth || !firestore)
       return {
         ok: false,
@@ -468,6 +468,13 @@ export function SessionProvider({ children }) {
           return { ok: false, error: "This account is currently inactive." };
         }
       } else {
+        if (selectedRole !== "customer") {
+          await signOutFromFirebase(firebaseAuth);
+          return {
+            ok: false,
+            error: `This social account has no ${selectedRole} profile. Ask the owner to assign the correct role first.`,
+          };
+        }
         const timestamp = new Date().toISOString();
         const profile = {
           name: authUser.displayName?.trim() || "Tita Mars customer",
@@ -481,6 +488,14 @@ export function SessionProvider({ children }) {
         };
         await setDoc(profileRef, profile);
         account = profileFor(authUser, profile);
+      }
+
+      if (account.role !== selectedRole) {
+        await signOutFromFirebase(firebaseAuth);
+        return {
+          ok: false,
+          error: `This account is registered as ${account.role}, not ${selectedRole}.`,
+        };
       }
 
       setUser(account);

@@ -49,7 +49,7 @@ export default function AuthPage({ mode = "login" }) {
     setError("");
     setSocialBusy(provider);
     try {
-      const result = await loginWithSocial(provider);
+      const result = await loginWithSocial(provider, accountRole);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -133,23 +133,13 @@ export default function AuthPage({ mode = "login" }) {
           </p>
         )}
         {!signup && !setup && (
-          <div className="role-tabs">
-            {[
-              ["customer", "Customer"],
-              ["staff", "Staff"],
-              ["owner", "Owner"],
-            ].map(([role, label]) => (
-              <a
-                href={`#login?${new URLSearchParams({
-                  role,
-                  ...(params.next ? { next: params.next } : {}),
-                })}`}
-                key={role}
-                className={accountRole === role ? "selected" : ""}
-              >
-                {label}
-              </a>
-            ))}
+          <div className="auth-role-lock" role="status">
+            <Icon name={accountRole === "customer" ? "user" : "lock"} size={15} />
+            <span>
+              {accountRole === "customer"
+                ? "Customer sign in"
+                : `${accountRole === "owner" ? "Owner / Admin" : "Staff"} workspace sign in`}
+            </span>
           </div>
         )}
         {emailStep && (
