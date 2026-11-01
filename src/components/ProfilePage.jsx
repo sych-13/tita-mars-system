@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "../context/SessionContext";
 import { useShop } from "../context/ShopContext";
 import ThemeToggle from "./ThemeToggle";
@@ -22,6 +22,16 @@ export default function ProfilePage() {
   });
   const [busy, setBusy] = useState(false);
   const [linking, setLinking] = useState("");
+  useEffect(() => {
+    if (!user) return;
+    setForm({
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      address: user.address || "",
+    });
+  }, [user?.id]);
+
   const save = async (e) => {
     e.preventDefault();
     setBusy(true);
