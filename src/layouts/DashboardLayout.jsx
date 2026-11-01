@@ -1,7 +1,9 @@
 import Sidebar from "../components/Sidebar";
 import Icon from "../components/Icon";
 import NotificationCenter from "../components/NotificationCenter";
+import { useHashRoute } from "../hooks/useHashRoute";
 export default function DashboardLayout({ children, role = "Owner / Admin" }) {
+  const { route, params } = useHashRoute();
   return (
     <div className="dashboard-shell">
       <a
@@ -34,7 +36,12 @@ export default function DashboardLayout({ children, role = "Owner / Admin" }) {
           </div>
         </header>
         <main id="main-content" className="dashboard-content" tabIndex="-1">
-          {children}
+          <div
+            className="route-transition"
+            key={`${route}:${Object.values(params).join("|")}`}
+          >
+            {children}
+          </div>
         </main>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 const ThemeContext = createContext();
 const STORAGE_KEY = "tita-mars-theme";
@@ -7,11 +7,28 @@ export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(
     () => localStorage.getItem(STORAGE_KEY) || "light",
   );
+  const firstRender = useRef(true);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    root.style.colorScheme = theme;
     localStorage.setItem(STORAGE_KEY, theme);
+
+    if (firstRender.current) {
+      firstRender.current = false;
+      return undefined;
+    }
+
+    // Keep the theme switch smooth without animating the first page load.
+    root.classList.remove("theme-transitioning");
+    void root.offsetWidth;
+    root.classList.add("theme-transitioning");
+    const timer = window.setTimeout(
+      () => root.classList.remove("theme-transitioning"),
+      760,
+    );
+    return () => window.clearTimeout(timer);
   }, [theme]);
 
   const toggleTheme = () =>

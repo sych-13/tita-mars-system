@@ -13,7 +13,7 @@ const AUTH_ROUTES = new Set([
 ]);
 
 export default function CustomerLayout({ children }) {
-  const { route } = useHashRoute();
+  const { route, params } = useHashRoute();
   const { itemCount } = useCart();
   const { role } = useSession();
   const showMobileNavigation = !AUTH_ROUTES.has(route);
@@ -43,7 +43,12 @@ export default function CustomerLayout({ children }) {
       </a>
       <Navbar />
       <main id="main-content" tabIndex="-1">
-        {children}
+        <div
+          className="route-transition"
+          key={`${route}:${Object.values(params).join("|")}`}
+        >
+          {children}
+        </div>
       </main>
       <Footer />
       {showMobileNavigation && (
