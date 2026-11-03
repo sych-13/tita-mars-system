@@ -1209,6 +1209,81 @@ select {
   }
 }
 
+/* Mobile storefront polish: keep fixed navigation from covering content and
+   give the hero enough room for its copy and CTA on narrow screens. */
+@media (max-width: 680px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .customer-shell {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .customer-shell > main {
+    min-width: 0;
+    padding-bottom: 0.75rem;
+  }
+
+  .home-page {
+    margin-bottom: 0.75rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .home-hero {
+    height: auto;
+    min-height: 20rem;
+  }
+
+  .hero-copy {
+    width: min(72%, 17rem);
+    padding: 1.8rem 0 1.7rem 1.35rem;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(2rem, 9.5vw, 2.6rem);
+    line-height: 1.1;
+  }
+
+  .hero-copy > p:not(.eyebrow) {
+    max-width: 13rem;
+    margin: 0.8rem 0 1rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  .hero-copy .btn-brand {
+    min-height: 2.7rem;
+    padding: 0.7rem 0.95rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .hero-photo {
+    object-position: 62% center;
+  }
+
+  .mobile-bottom-nav {
+    min-height: 4.25rem;
+    padding: 0.5rem 0.4rem calc(0.5rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 24px rgb(var(--shadow-color) / 0.16);
+  }
+
+  .mobile-bottom-nav a {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
+
+  .mobile-bottom-nav a > span {
+    min-height: 1.65rem;
+    align-items: center;
+  }
+}
+
 /* Account page polish: clearer hierarchy, roomier fields, and a stronger mobile layout. */
 .profile-page {
   padding-top: clamp(2.8rem, 6vw, 5rem);
