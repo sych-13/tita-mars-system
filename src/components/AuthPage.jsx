@@ -6,6 +6,8 @@ import BrandMark from "./BrandMark";
 import Icon from "./Icon";
 import SocialIcon from "./SocialIcon";
 
+const PENDING_VERIFICATION_KEY = "tita-mars-pending-verification";
+
 export default function AuthPage({ mode = "login" }) {
   const { params, navigate } = useHashRoute();
   const {
@@ -32,7 +34,11 @@ export default function AuthPage({ mode = "login" }) {
   const [busy, setBusy] = useState(false);
   const [socialBusy, setSocialBusy] = useState("");
   const [error, setError] = useState("");
-  const [emailStep, setEmailStep] = useState(null);
+  const [emailStep, setEmailStep] = useState(() => {
+    if (mode !== "register") return null;
+    const pendingEmail = sessionStorage.getItem(PENDING_VERIFICATION_KEY);
+    return pendingEmail ? { email: pendingEmail } : null;
+  });
   const title = setup
     ? "Set up your owner account"
     : signup
@@ -88,11 +94,13 @@ export default function AuthPage({ mode = "login" }) {
           : await login(form.email, form.password, accountRole);
       if (result.ok) {
         if (result.emailVerificationSent) {
+          sessionStorage.setItem(PENDING_VERIFICATION_KEY, result.email);
           setEmailStep({
             email: result.email,
           });
           return;
         }
+        sessionStorage.removeItem(PENDING_VERIFICATION_KEY);
         navigate(params.next || destinationFor(result.account));
       }
       else setError(result.error);
@@ -161,7 +169,10 @@ export default function AuthPage({ mode = "login" }) {
             <button
               className="btn-outline full-button"
               type="button"
-              onClick={() => setEmailStep(null)}
+              onClick={() => {
+                sessionStorage.removeItem(PENDING_VERIFICATION_KEY);
+                setEmailStep(null);
+              }}
             >
               Back
             </button>
