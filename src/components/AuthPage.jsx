@@ -43,7 +43,11 @@ export default function AuthPage({ mode = "login" }) {
           ? "Admin Login"
           : "Welcome Back!";
   const update = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-  const destinationFor = () => "home";
+  const destinationFor = (account) => {
+    if (account?.role === "owner") return "owner";
+    if (account?.role === "staff") return "staff";
+    return "home";
+  };
 
   const continueWithSocial = async (provider) => {
     setError("");

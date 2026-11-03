@@ -1160,6 +1160,19 @@ select {
   font-size: 0.72rem;
 }
 
+.private-workspace-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+}
+
+.private-workspace-links .btn-secondary {
+  min-height: 2.55rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.76rem;
+}
+
 @media (max-width: 760px) {
   .customer-access-layout {
     grid-template-columns: 1fr;
@@ -1168,6 +1181,11 @@ select {
   .customer-access-card,
   .private-access-card {
     min-height: 0;
+  }
+
+  .private-workspace-links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -1178,6 +1196,15 @@ select {
 
   .customer-access-actions .btn-brand,
   .customer-access-actions .btn-secondary {
+    width: 100%;
+  }
+
+  .private-workspace-links {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .private-workspace-links .btn-secondary {
     width: 100%;
   }
 }

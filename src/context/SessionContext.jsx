@@ -33,7 +33,7 @@ const SESSION_KEY = "tita-mars-session";
 const messageForAuthError = (error, fallback) => {
   switch (error?.code) {
     case "auth/email-already-in-use":
-      return "This email already has an account. Please log in instead.";
+      return "This email still has a Firebase Authentication account. Deleting its Firestore profile does not delete the login. Sign in with the existing password to restore a customer profile, or delete the user from Firebase Authentication before registering again.";
     case "auth/invalid-credential":
     case "auth/user-not-found":
     case "auth/wrong-password":
@@ -292,6 +292,40 @@ export function SessionProvider({ children }) {
             doc(firestore, "profiles", credential.user.uid),
           );
           if (!profileSnapshot.exists()) {
+            // A Firestore profile can be deleted independently from the
+            // Firebase Authentication user. Allow a verified customer who
+            // still proves ownership of the email/password to repair that
+            // orphaned profile. Never auto-create owner/staff profiles here.
+            if (
+              selectedRole === "customer" &&
+              credential.user.email &&
+              credential.user.emailVerified
+            ) {
+              const timestamp = new Date().toISOString();
+              const repairedProfile = {
+                name: credential.user.displayName || "Tita Mars customer",
+                email: credential.user.email.toLowerCase(),
+                phone: "",
+                address: "",
+                role: "customer",
+                active: true,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              };
+              await setDoc(
+                doc(firestore, "profiles", credential.user.uid),
+                repairedProfile,
+              );
+              const repairedAccount = profileFor(
+                credential.user,
+                repairedProfile,
+              );
+              setUser(repairedAccount);
+              setAuthProviders(providerIdsFor(credential.user));
+              setDemoRole(repairedAccount.role);
+              setReady(true);
+              return { ok: true, account: repairedAccount, profileRepaired: true };
+            }
             await signOutFromFirebase(firebaseAuth);
             return {
               ok: false,

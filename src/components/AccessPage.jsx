@@ -70,7 +70,15 @@ export default function AccessPage() {
               Staff and Owner/Admin sign-in is restricted to assigned accounts
               and is not shown in the customer account menu.
             </p>
-            <small>Use your private workspace link if you are part of the Tita Mars team.</small>
+            <small>Team members can open their private sign-in below. Seeing the page does not grant workspace access; Firebase still checks the account role.</small>
+            <div className="private-workspace-links" aria-label="Private workspace sign-in links">
+              <a className="btn-secondary" href="#login?role=staff">
+                Staff sign in <Icon name="arrow" size={15} />
+              </a>
+              <a className="btn-secondary" href="#login?role=owner">
+                Owner sign in <Icon name="arrow" size={15} />
+              </a>
+            </div>
           </aside>
         </div>
       ) : (
