@@ -16,11 +16,26 @@ This roadmap does not change the current system. It records the recommended orde
 
 ## Phase 3 — Delivery confirmation
 
-- Add delivery OTP first.
+- Delivery OTP is implemented as a free in-app/manual handoff flow.
+- Keep expiry, one-time-use, role checks, and audit logging tests as the flow evolves.
 - Add optional delivery QR only if the business workflow needs it.
 - Record verifier, time, and audit history without exposing customer data.
 
 ## Phase 4 — Production hardening
+
+- Enable Firebase App Check where compatible.
+- Add rate limiting and monitoring.
+- Configure Cloud Functions and Storage only after Blaze billing approval.
+- Add automated browser tests for mobile camera permissions and failure states.
+
+## Phase 4 — Delivery pricing and customer experience
+
+- Add optional map-pin selection and address validation.
+- Show estimated distance and the proposed base fee plus ₱5 surcharge when the destination exceeds 2 km.
+- Recalculate and store the final delivery fee in a trusted backend or protected transaction.
+- Keep a manual address fallback and service-area validation for Taytay/Cainta.
+
+## Phase 5 — Production hardening
 
 - Enable Firebase App Check where compatible.
 - Add rate limiting and monitoring.

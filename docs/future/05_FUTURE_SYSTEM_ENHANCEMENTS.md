@@ -1,6 +1,10 @@
 # Future system enhancements
 
-This document lists possible improvements for the Tita Mars Eatery and Bakery system. These are recommendations only; none of the features below are enabled by this document.
+This document lists possible improvements for the Tita Mars Eatery and Bakery system. These are recommendations only; writing them here does not enable a feature.
+
+## Current status note
+
+The basic in-app delivery OTP confirmation is already implemented separately in `02_DELIVERY_QR_OTP_CONFIRMATION.md`. The distance-based delivery fee described below remains planning-only. All other items are future work unless the current application UI already provides a limited version of the feature.
 
 ## Priority guide
 
@@ -115,6 +119,15 @@ Add delivery address validation, saved addresses, optional map pin, directions l
 ### 16. Installable mobile experience
 
 Complete PWA support with an install prompt, app icon sizes, offline shell, cached catalog assets, and a clear offline message. Authentication, checkout, and payment still require internet access.
+
+### 21. Distance-based delivery fees
+
+Replace the current fixed delivery fee with a transparent distance-based calculation:
+
+- Up to and including 2 km: regular base fee.
+- More than 2 km: base fee plus a ₱5 surcharge.
+
+Customer-side checkout should show the selected address/map pin, estimated distance, surcharge, and final fee before order confirmation. The final calculation must be repeated in a trusted backend or protected transaction so a customer cannot edit the submitted total. See `06_DISTANCE_BASED_DELIVERY_FEES.md` for the data model, location options, and edge cases.
 
 ## P3 — Growth and analytics
 
