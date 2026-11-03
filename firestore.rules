@@ -89,6 +89,39 @@ service cloud.firestore {
             request.resource.data.paymentVerifiedBy == null));
     }
 
+    function validDeliveryOtpFields() {
+      return
+        ((request.resource.data.orderType == 'pickup' &&
+            request.resource.data.get('deliveryOtp', null) == null &&
+            request.resource.data.get('deliveryOtpExpiresAt', null) == null &&
+            request.resource.data.get('deliveryOtpVerifiedAt', null) == null &&
+            request.resource.data.get('deliveryOtpVerifiedBy', null) == null) ||
+          (request.resource.data.orderType == 'delivery' &&
+            request.resource.data.get('deliveryOtp', null) is string &&
+            request.resource.data.get('deliveryOtp', '').matches('^[0-9]{6}$') &&
+            request.resource.data.get('deliveryOtpExpiresAt', null) is string &&
+            request.resource.data.get('deliveryOtpVerifiedAt', null) == null &&
+            request.resource.data.get('deliveryOtpVerifiedBy', null) == null));
+    }
+
+    function validDeliveryOtpUnchanged() {
+      return request.resource.data.get('deliveryOtp', null) ==
+          resource.data.get('deliveryOtp', null) &&
+        request.resource.data.get('deliveryOtpExpiresAt', null) ==
+          resource.data.get('deliveryOtpExpiresAt', null) &&
+        request.resource.data.get('deliveryOtpVerifiedAt', null) ==
+          resource.data.get('deliveryOtpVerifiedAt', null) &&
+        request.resource.data.get('deliveryOtpVerifiedBy', null) ==
+          resource.data.get('deliveryOtpVerifiedBy', null);
+    }
+
+    function validDeliveryCompletion() {
+      return resource.data.orderType != 'delivery' ||
+        request.resource.data.status != 'Completed' ||
+        request.resource.data.get('deliveryOtp', null) == null ||
+        request.resource.data.get('deliveryOtpVerifiedAt', null) is string;
+    }
+
     function validNewOrder(orderId) {
       return request.resource.data.keys().hasOnly([
           'id', 'customerId', 'customer', 'phone', 'email', 'address',
@@ -98,7 +131,8 @@ service cloud.firestore {
           'paymentVerifiedAt', 'paymentVerifiedBy', 'gcashReference',
           'gcashSenderName', 'gcashPaidAt', 'gcashPaymentNote',
           'paymentSubmittedAt', 'fulfillmentTiming', 'scheduledFor',
-          'statusHistory'
+          'statusHistory', 'deliveryOtp', 'deliveryOtpExpiresAt',
+          'deliveryOtpVerifiedAt', 'deliveryOtpVerifiedBy'
         ]) &&
         request.resource.data.id == orderId &&
         request.resource.data.customerId == request.auth.uid &&
@@ -172,7 +206,8 @@ service cloud.firestore {
         request.resource.data.statusHistory[0].actorId == request.auth.uid &&
         request.resource.data.createdAt is string &&
         request.resource.data.updatedAt is string &&
-        request.resource.data.inventoryDeductedAt == null;
+        request.resource.data.inventoryDeductedAt == null &&
+        validDeliveryOtpFields();
     }
 
     function validProduct(productId) {
@@ -357,7 +392,9 @@ service cloud.firestore {
         (isStaff() &&
           ((request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly([
-                'status', 'updatedAt', 'inventoryDeductedAt', 'statusHistory'
+                'status', 'updatedAt', 'inventoryDeductedAt', 'statusHistory',
+                'deliveryOtp', 'deliveryOtpExpiresAt', 'deliveryOtpVerifiedAt',
+                'deliveryOtpVerifiedBy'
               ]) &&
             request.resource.data.updatedAt is string &&
             request.resource.data.statusHistory is list &&
@@ -365,7 +402,18 @@ service cloud.firestore {
               resource.data.get('statusHistory', []).size() &&
             validStatusForOrder() &&
             validStatusTransition() &&
-            validInventoryMarker()) ||
+            validInventoryMarker() &&
+            validDeliveryOtpUnchanged() &&
+            validDeliveryCompletion()) ||
+           (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly([
+                'deliveryOtpVerifiedAt', 'deliveryOtpVerifiedBy', 'updatedAt'
+              ]) &&
+            resource.data.orderType == 'delivery' &&
+            resource.data.status == 'Out for Delivery' &&
+            request.resource.data.deliveryOtpVerifiedAt is string &&
+            request.resource.data.deliveryOtpVerifiedBy == request.auth.uid &&
+            request.resource.data.updatedAt is string) ||
            (request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly([
                 'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy',

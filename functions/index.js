@@ -2,6 +2,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { logger } = require("firebase-functions");
 const { HttpsError, onCall } = require("firebase-functions/v2/https");
+const { randomInt } = require("node:crypto");
 
 initializeApp();
 
@@ -29,6 +30,8 @@ const callableOptions = {
 
 const cleanText = (value, maxLength) =>
   typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+
+const createDeliveryOtp = () => String(randomInt(100000, 1000000));
 
 const manilaMinutes = (value) => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -258,6 +261,10 @@ exports.createOrder = onCall(callableOptions, async (request) => {
           ? Math.max(0, configuredFee)
           : 0;
       const timestamp = new Date().toISOString();
+      const deliveryOtp = orderType === "delivery" ? createDeliveryOtp() : null;
+      const deliveryOtpExpiresAt = deliveryOtp
+        ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        : null;
       createdOrder = {
         id: orderRef.id,
         customerId: request.auth.uid,
@@ -289,6 +296,10 @@ exports.createOrder = onCall(callableOptions, async (request) => {
         createdAt: timestamp,
         updatedAt: timestamp,
         inventoryDeductedAt: null,
+        deliveryOtp,
+        deliveryOtpExpiresAt,
+        deliveryOtpVerifiedAt: null,
+        deliveryOtpVerifiedBy: null,
         statusHistory: [
           {
             status: "Pending",
@@ -329,6 +340,16 @@ exports.updateOrderStatus = onCall(callableOptions, async (request) => {
       if (!nextStatuses(order).has(requestedStatus))
         throw businessError(
           `Move this order to its next ${order.orderType === "delivery" ? "delivery" : "pickup"} status first.`,
+        );
+      if (
+        requestedStatus === "Completed" &&
+        order.orderType === "delivery" &&
+        order.deliveryOtp &&
+        !order.deliveryOtpVerifiedAt
+      )
+        throw businessError(
+          "Verify the delivery OTP before marking this delivery Completed.",
+          "failed-precondition",
         );
 
       const timestamp = new Date().toISOString();
@@ -418,6 +439,67 @@ exports.updateOrderStatus = onCall(callableOptions, async (request) => {
   }
 
   return { ok: true };
+});
+
+exports.verifyDeliveryOtp = onCall(callableOptions, async (request) => {
+  if (!request.auth)
+    throw businessError("Sign in before verifying a delivery OTP.", "unauthenticated");
+  const actor = await requireActiveProfile(request.auth.uid, ["staff", "owner"]);
+  const orderId = cleanText(request.data?.orderId, 128);
+  const entered = cleanText(request.data?.otp, 6).replace(/\D/g, "");
+  if (!orderId || orderId.includes("/") || !/^\d{6}$/.test(entered))
+    throw businessError("Enter the 6-digit delivery OTP.", "invalid-argument");
+
+  let verified = false;
+  try {
+    await db.runTransaction(async (transaction) => {
+      const orderRef = db.doc(`orders/${orderId}`);
+      const snapshot = await transaction.get(orderRef);
+      if (!snapshot.exists) throw businessError("Order not found.", "not-found");
+      const order = snapshot.data();
+      if (order.orderType !== "delivery" || order.status !== "Out for Delivery")
+        throw businessError(
+          "Delivery OTP can be verified once the order is Out for Delivery.",
+          "failed-precondition",
+        );
+      if (order.deliveryOtpVerifiedAt) {
+        verified = true;
+        return;
+      }
+      if (
+        !order.deliveryOtp ||
+        !order.deliveryOtpExpiresAt ||
+        new Date(order.deliveryOtpExpiresAt).getTime() <= Date.now()
+      )
+        throw businessError("This delivery OTP has expired.", "failed-precondition");
+      if (order.deliveryOtp !== entered)
+        throw businessError("That delivery OTP does not match.", "permission-denied");
+      const timestamp = new Date().toISOString();
+      transaction.update(orderRef, {
+        deliveryOtpVerifiedAt: timestamp,
+        deliveryOtpVerifiedBy: request.auth.uid,
+        updatedAt: timestamp,
+      });
+      verified = true;
+      const auditRef = db.collection("auditLogs").doc();
+      transaction.create(auditRef, {
+        id: auditRef.id,
+        action: "verify_delivery_otp",
+        entityType: "order",
+        entityId: orderId,
+        summary: `Verified delivery OTP for ${cleanText(order.number, 80)}.`,
+        actorId: request.auth.uid,
+        actorName: cleanText(actor.name, 120) || actor.role,
+        actorRole: actor.role,
+        createdAt: timestamp,
+      });
+    });
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("verifyDeliveryOtp failed", { orderId, error });
+    throw businessError("Unable to verify delivery OTP.", "internal");
+  }
+  return { ok: verified };
 });
 
 exports.updatePaymentStatus = onCall(callableOptions, async (request) => {

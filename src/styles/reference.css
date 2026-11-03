@@ -3695,6 +3695,70 @@ textarea {
 .tracking-payment-status small {
   color: var(--muted-text-color);
 }
+.delivery-otp-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 17px 0;
+  padding: 14px;
+  border: 1px solid var(--primary-orange);
+  border-radius: 10px;
+  background: var(--primary-orange-soft);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.delivery-otp-card > div:first-child {
+  display: grid;
+  gap: 7px;
+}
+.delivery-otp-card p,
+.delivery-otp-card small {
+  margin: 0;
+  font-size: 10px;
+}
+.delivery-otp-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.delivery-otp-entry input {
+  width: 112px;
+  padding: 10px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--text-color);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+.customer-delivery-otp-card {
+  align-items: flex-start;
+}
+.customer-delivery-otp-card h3 {
+  margin: 0;
+  color: var(--primary-orange);
+  font-size: 28px;
+  letter-spacing: 0.22em;
+}
+.otp-verified-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+}
 .pickup-qr-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 148px;
@@ -3788,6 +3852,16 @@ textarea {
   .payment-verification-card {
     align-items: stretch;
     flex-direction: column;
+  }
+  .delivery-otp-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .delivery-otp-entry {
+    align-items: stretch;
+  }
+  .delivery-otp-entry input {
+    flex: 1;
   }
   .product-table-filters {
     flex-wrap: wrap;

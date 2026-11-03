@@ -14,8 +14,14 @@ import Modal from "./Modal";
 import Icon from "./Icon";
 import OrderReceipt from "./OrderReceipt";
 import { peso, prettyDate } from "../utils/formatters";
+import { normalizeDeliveryOtp } from "../utils/deliveryOtp";
 export default function OrderManagement({ role = "owner" }) {
-  const { orders, updateOrderStatus, updatePaymentStatus } = useOrders();
+  const {
+    orders,
+    updateOrderStatus,
+    verifyDeliveryOtp,
+    updatePaymentStatus,
+  } = useOrders();
   const { products } = useProducts();
   const { notify, settings } = useShop();
   const { params, navigate } = useHashRoute();
@@ -25,6 +31,8 @@ export default function OrderManagement({ role = "owner" }) {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [paymentUpdating, setPaymentUpdating] = useState(false);
+  const [deliveryOtp, setDeliveryOtp] = useState("");
+  const [deliveryOtpUpdating, setDeliveryOtpUpdating] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const visible = orders.filter(
     (o) =>
@@ -37,6 +45,7 @@ export default function OrderManagement({ role = "owner" }) {
   useEffect(() => {
     setStatus(current?.status || "");
     setUpdateError("");
+    setDeliveryOtp("");
   }, [current?.id, current?.status]);
   const close = () => navigate("manage-orders");
   const open = (o) => {
@@ -67,6 +76,15 @@ export default function OrderManagement({ role = "owner" }) {
         ? `${current.number} payment marked ${next.toLowerCase()}.`
         : result.error,
     );
+  };
+  const verifyOtp = async () => {
+    setUpdateError("");
+    setDeliveryOtpUpdating(true);
+    const result = await verifyDeliveryOtp(current.id, deliveryOtp);
+    setDeliveryOtpUpdating(false);
+    notify(result.ok ? `${current.number} delivery OTP verified.` : result.error);
+    if (!result.ok) setUpdateError(result.error || "Unable to verify delivery OTP.");
+    if (result.ok) setDeliveryOtp("");
   };
   return (
     <DashboardLayout role={role === "staff" ? "Staff" : "Owner / Admin"}>
@@ -280,6 +298,49 @@ export default function OrderManagement({ role = "owner" }) {
                     ? "Mark as pending"
                     : "Verify payment"}
               </button>
+            </section>
+          )}
+          {current.orderType === "delivery" && current.status === "Out for Delivery" && (
+            <section className="delivery-otp-card">
+              <div>
+                <span className="payment-verification-label">
+                  Delivery OTP verification
+                </span>
+                {current.deliveryOtpVerifiedAt ? (
+                  <p className="otp-verified-note" role="status">
+                    <Icon name="check" size={16} weight="fill" />
+                    Verified {prettyDate(current.deliveryOtpVerifiedAt)}. You may complete this delivery.
+                  </p>
+                ) : (
+                  <p>
+                    Ask the customer for the 6-digit code shown in their order tracking, then verify it here before completion.
+                  </p>
+                )}
+              </div>
+              {!current.deliveryOtpVerifiedAt && (
+                <div className="delivery-otp-entry">
+                  <label>
+                    <span className="sr-only">Delivery OTP</span>
+                    <input
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={deliveryOtp}
+                      onChange={(event) => setDeliveryOtp(normalizeDeliveryOtp(event.target.value))}
+                      aria-label="Delivery OTP"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-brand"
+                    onClick={verifyOtp}
+                    disabled={deliveryOtpUpdating || deliveryOtp.length !== 6}
+                  >
+                    {deliveryOtpUpdating ? "Verifying…" : "Verify OTP"}
+                  </button>
+                </div>
+              )}
             </section>
           )}
           <section className="status-history-card">

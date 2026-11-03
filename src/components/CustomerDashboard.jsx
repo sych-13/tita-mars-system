@@ -250,6 +250,22 @@ export default function CustomerDashboard() {
                 active.status === "Ready for Pickup" && (
                   <PickupVerificationQr order={active} />
                 )}
+              {active.orderType === "delivery" &&
+                active.status === "Out for Delivery" &&
+                active.deliveryOtp && (
+                  <section className="delivery-otp-card customer-delivery-otp-card">
+                    <div>
+                      <span className="payment-verification-label">Delivery confirmation code</span>
+                      <h3 aria-label="Delivery OTP">{active.deliveryOtp}</h3>
+                      <p>Give this 6-digit code to the delivery staff when your order arrives. Never share it before delivery.</p>
+                      {active.deliveryOtpVerifiedAt && (
+                        <small className="otp-verified-note">
+                          <Icon name="check" size={15} weight="fill" /> Confirmed {prettyDate(active.deliveryOtpVerifiedAt)}
+                        </small>
+                      )}
+                    </div>
+                  </section>
+                )}
               <div className="tracking-details">
                 {active.items.map((item) => (
                   <div className="summary-row" key={item.id}>

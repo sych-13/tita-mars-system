@@ -36,6 +36,13 @@ import { useSession } from "./SessionContext";
 import { useShop } from "./ShopContext";
 import { useActivity } from "./ActivityContext";
 import { validateOrderSchedule } from "../utils/businessHours";
+import {
+  createDeliveryOtp,
+  deliveryOtpExpiresAt,
+  isDeliveryOtpExpired,
+  isValidDeliveryOtp,
+  normalizeDeliveryOtp,
+} from "../utils/deliveryOtp";
 
 const OrdersContext = createContext();
 const STORAGE_KEY = "tita-mars-orders-v2";
@@ -92,6 +99,14 @@ const normalizeOrder = (order) => ({
   gcashPaymentNote:
     typeof order.gcashPaymentNote === "string" ? order.gcashPaymentNote : "",
   paymentSubmittedAt: toIsoDate(order.paymentSubmittedAt),
+  deliveryOtp:
+    typeof order.deliveryOtp === "string" ? order.deliveryOtp : null,
+  deliveryOtpExpiresAt: toIsoDate(order.deliveryOtpExpiresAt),
+  deliveryOtpVerifiedAt: toIsoDate(order.deliveryOtpVerifiedAt),
+  deliveryOtpVerifiedBy:
+    typeof order.deliveryOtpVerifiedBy === "string"
+      ? order.deliveryOtpVerifiedBy
+      : null,
   statusHistory: Array.isArray(order.statusHistory)
     ? order.statusHistory.map((entry) => ({
         ...entry,
@@ -237,6 +252,11 @@ export function OrdersProvider({ children }) {
       if (gcashPaidAt && Number.isNaN(gcashPaidAt.getTime()))
         return { ok: false, error: "Enter a valid GCash payment date." };
       const timestamp = new Date().toISOString();
+      const deliveryOtp =
+        data.orderType === "delivery" ? createDeliveryOtp() : null;
+      const deliveryOtpExpires = deliveryOtp
+        ? deliveryOtpExpiresAt(Date.parse(timestamp))
+        : null;
 
       if (firebaseConfigured && firestore) {
         if (!user)
@@ -385,6 +405,10 @@ export function OrdersProvider({ children }) {
               createdAt: timestamp,
               updatedAt: timestamp,
               inventoryDeductedAt: null,
+              deliveryOtp,
+              deliveryOtpExpiresAt: deliveryOtpExpires,
+              deliveryOtpVerifiedAt: null,
+              deliveryOtpVerifiedBy: null,
               statusHistory: [
                 {
                   status: "Pending",
@@ -434,6 +458,10 @@ export function OrdersProvider({ children }) {
         createdAt: timestamp,
         updatedAt: timestamp,
         inventoryDeductedAt: null,
+        deliveryOtp,
+        deliveryOtpExpiresAt: deliveryOtpExpires,
+        deliveryOtpVerifiedAt: null,
+        deliveryOtpVerifiedBy: null,
         statusHistory: [
           {
             status: "Pending",
@@ -489,6 +517,14 @@ export function OrdersProvider({ children }) {
             )
               throw new Error(
                 `${current.status} orders are locked to protect order and inventory records.`,
+              );
+            if (
+              status === "Completed" &&
+              current.orderType === "delivery" &&
+              !current.deliveryOtpVerifiedAt
+            )
+              throw new Error(
+                "Verify the delivery OTP before marking this delivery Completed.",
               );
 
             const timestamp = new Date().toISOString();
@@ -608,6 +644,15 @@ export function OrdersProvider({ children }) {
           ok: false,
           error: `${target.status} orders are locked to protect order and inventory records.`,
         };
+      if (
+        status === "Completed" &&
+        target.orderType === "delivery" &&
+        !target.deliveryOtpVerifiedAt
+      )
+        return {
+          ok: false,
+          error: "Verify the delivery OTP before marking this delivery Completed.",
+        };
 
       let deductedAt = target.inventoryDeductedAt;
       if (status === "Completed" && !deductedAt) {
@@ -653,6 +698,106 @@ export function OrdersProvider({ children }) {
       return { ok: true };
     },
     [commitOrders, deductInventory, logActivity, role, user],
+  );
+
+  const verifyDeliveryOtp = useCallback(
+    async (id, value) => {
+      const entered = normalizeDeliveryOtp(value);
+      const target = ordersRef.current.find((order) => order.id === id);
+      if (!target) return { ok: false, error: "Order not found." };
+      if (!isValidDeliveryOtp(entered))
+        return { ok: false, error: "Enter the 6-digit delivery OTP." };
+      if (target.orderType !== "delivery")
+        return { ok: false, error: "This order does not require delivery OTP verification." };
+      if (target.status !== "Out for Delivery")
+        return { ok: false, error: "Delivery OTP can be verified once the order is Out for Delivery." };
+      if (target.deliveryOtpVerifiedAt)
+        return { ok: true, alreadyVerified: true };
+      if (isDeliveryOtpExpired(target.deliveryOtpExpiresAt))
+        return { ok: false, error: "This delivery OTP has expired." };
+
+      if (firebaseConfigured && firestore) {
+        if (!user || !["staff", "owner"].includes(role))
+          return { ok: false, error: "Only staff or the owner can verify delivery OTP." };
+        if (trustedBackendEnabled && firebaseFunctions) {
+          try {
+            const verifyOtp = httpsCallable(firebaseFunctions, "verifyDeliveryOtp");
+            await verifyOtp({ orderId: id, otp: entered });
+            return { ok: true };
+          } catch (error) {
+            return {
+              ok: false,
+              error: orderError(error, "Unable to verify delivery OTP."),
+            };
+          }
+        }
+        try {
+          let verifiedOrder;
+          await runTransaction(firestore, async (transaction) => {
+            const orderRef = doc(firestore, "orders", id);
+            const snapshot = await transaction.get(orderRef);
+            if (!snapshot.exists()) throw new Error("Order not found.");
+            const current = normalizeOrder({ id: snapshot.id, ...snapshot.data() });
+            if (current.deliveryOtpVerifiedAt) {
+              verifiedOrder = current;
+              return;
+            }
+            if (current.orderType !== "delivery" || current.status !== "Out for Delivery")
+              throw new Error("Delivery OTP can be verified once the order is Out for Delivery.");
+            if (isDeliveryOtpExpired(current.deliveryOtpExpiresAt))
+              throw new Error("This delivery OTP has expired.");
+            if (current.deliveryOtp !== entered)
+              throw new Error("That delivery OTP does not match.");
+            const timestamp = new Date().toISOString();
+            const changes = {
+              deliveryOtpVerifiedAt: timestamp,
+              deliveryOtpVerifiedBy: user.id,
+              updatedAt: timestamp,
+            };
+            transaction.update(orderRef, changes);
+            verifiedOrder = normalizeOrder({ ...current, ...changes });
+          });
+          if (verifiedOrder) {
+            commitOrders((current) =>
+              current.map((order) => (order.id === id ? verifiedOrder : order)),
+            );
+          }
+          await logActivity({
+            action: "verify_delivery_otp",
+            entityType: "order",
+            entityId: id,
+            summary: `Verified delivery OTP for ${target.number}.`,
+          });
+          return { ok: true, alreadyVerified: Boolean(target.deliveryOtpVerifiedAt) };
+        } catch (error) {
+          return { ok: false, error: orderError(error, "Unable to verify delivery OTP.") };
+        }
+      }
+
+      if (target.deliveryOtp !== entered)
+        return { ok: false, error: "That delivery OTP does not match." };
+      const timestamp = new Date().toISOString();
+      commitOrders((current) =>
+        current.map((order) =>
+          order.id === id
+            ? {
+                ...order,
+                deliveryOtpVerifiedAt: timestamp,
+                deliveryOtpVerifiedBy: user?.id || role,
+                updatedAt: timestamp,
+              }
+            : order,
+        ),
+      );
+      await logActivity({
+        action: "verify_delivery_otp",
+        entityType: "order",
+        entityId: id,
+        summary: `Verified delivery OTP for ${target.number}.`,
+      });
+      return { ok: true };
+    },
+    [commitOrders, logActivity, role, user],
   );
 
   const updatePaymentStatus = useCallback(
@@ -883,6 +1028,7 @@ export function OrdersProvider({ children }) {
       isLoading,
       createOrder,
       updateOrderStatus,
+      verifyDeliveryOtp,
       updatePaymentStatus,
       submitPaymentDetails,
       saveReview,
@@ -892,6 +1038,7 @@ export function OrdersProvider({ children }) {
       orders,
       isLoading,
       updateOrderStatus,
+      verifyDeliveryOtp,
       updatePaymentStatus,
       submitPaymentDetails,
       saveReview,
